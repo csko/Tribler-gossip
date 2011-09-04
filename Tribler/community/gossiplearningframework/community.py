@@ -1,7 +1,5 @@
-from random import choice
-
 from conversion import Conversion
-from payload import TextPayload
+from payload import MixedPayload
 
 from Tribler.Core.dispersy.authentication import MemberAuthentication
 from Tribler.Core.dispersy.community import Community
@@ -17,10 +15,7 @@ from Tribler.Core.dispersy.message import Message, DelayMessageByProof
 from Tribler.Core.dispersy.resolution import LinearResolution
 from Tribler.Core.dispersy.destination import CommunityDestination
 
-from Tribler.Core.Statistics.Status.NullReporter import NullReporter
-from Tribler.Core.Statistics.Status.Status import get_status_holder
-from Tribler.Core.Statistics.Status.TUDelftReporter import TUDelftReporter
-
+# Send every 5 seconds.
 DELAY=5.0
 
 if __debug__:
@@ -47,88 +42,78 @@ class VotingTestCommunity(Community):
         super(VotingTestCommunity, self).__init__(cid, master_public_key)
         if __debug__: dprint(self._cid.encode("HEX"))
 
-        # A container for the votes
-        self._queue = []
+        # The (now static) message we will be sending. These parameters will be used to create the payload.
+        self._text = u"Test"
+        self._number = 123456.789
+        self._array = [1, 2, "abc", 5.0, [3, 4]]
 
-        # initially we either choose yes or no at random
-        self._choice = choice(["yes", "no"])
-
-        # periodically we will tell other nodes out choice
-        self._dispersy.callback.register(self._periodically_tell_choice, delay=DELAY)
+        # Periodically we will send our data to ther node(s).
+        self._dispersy.callback.register(self._periodically_send_model, delay=DELAY)
 
     def initiate_meta_messages(self):
-        return [Message(self, u"choice",
+        """Define the messages we will be using."""
+        return [Message(self, u"modeldata",
                 MemberAuthentication(encoding="sha1"), # Only signed with the owner's SHA1 digest
                 PublicResolution(),
                 DirectDistribution(),
 #                FullSyncDistribution(), # Full gossip
-                CommunityDestination(node_count=1),
-                TextPayload(),
-                self.check_choice,
-                self.on_choice,
+                CommunityDestination(node_count=1), # Reach only one node each time.
+                MixedPayload(),
+                self.check_model,
+                self.on_receive_model,
                 delay=DELAY)]
 
     def initiate_conversions(self):
         return [DefaultConversion(self),
                 Conversion(self)]
 
-    def _periodically_tell_choice(self):
-        meta = self.get_meta_message(u"choice")
-        dprint(meta)
-        dprint(self._choice)
-        choice = unicode(self._choice)
-        assert isinstance(choice, unicode)
+    def _periodically_send_model(self):
+        meta = self.get_meta_message(u"modeldata")
+        if __debug__:
+            dprint(meta)
+
+        # TODO: Reuse code?
+        assert isinstance(self._text, unicode)
+        assert isinstance(self._number, float)
+        assert isinstance(self._array, list)
+
+        # "Active thread", send a message and wait delta time.
         while True:
-            # create message with my choice
+            # Create and implement message with 3 parameters
             message = meta.implement(meta.authentication.implement(self._my_member),
                                      meta.distribution.implement(self.global_time),
 #                                     meta.distribution.implement(self.claim_global_time()),
                                      meta.destination.implement(),
 #                                     meta.destination.implement(True),
-                                     meta.payload.implement(choice))
-#                                     meta.payload.implement(text))
-            self._dispersy.store_update_forward([message], False, False, True)
-#            self._dispersy.store_update_forward([message], True, True, True)
+                                     meta.payload.implement(self._text, self._number, self._array))
+#            self._dispersy.store_update_forward([message], False, False, True)
+            self._dispersy.store_update_forward([message], True, True, True) # For testing
 
             # wait some time and make a new message
             yield DELAY
 
-    def check_choice(self, messages):
+    def check_model(self, messages):
         """
-        Check one or more 'choice' messages that have been received.
+        One or more models have been received, we check them for validity.
+        This is a generator function and We can either forward a message or drop it.
         """
-        # since we allow any text to be put in our messages, we much ensure that it is either "yes"
-        # or "no"
-        dprint("check_choice")
         for message in messages:
-            if message.payload.text in ("yes", "no"):
-                yield message
+            # Example.
+            if message.number == 1234.0:
+                yield DropMessage("1234.0 is an invalid number in this protocol.")
             else:
-                yield DropMessage("The choice should be either 'yes' or 'no'")
+                yield message # Accept message.
 
-    def on_choice(self, messages):
+    def on_receive_model(self, messages):
         """
-        One or more 'choice' messages have been received.
+        One or more models have been received from other peers so we update.
         """
-        # add choices to the queue
         for message in messages:
-            self._queue.append(message.payload.text)
-        dprint("Received message!")
-        dprint(self._queue)
+            dprint("Message")
+            dprint(message)
+            dprint(message.payload)
+            dprint(("Received text:", message.payload.text))
+            dprint(("Received number:", message.payload.number))
+            dprint(("Received array:", message.payload.array))
 
-        # when we have two or more choices we will make a new choice
-        if len(self._queue) > 1:
-            yes_votes = 1 if self._choice == "yes" else 0
-            no_votes = 1 if self._choice == "no" else 0
-            for vote in self._queue:
-                if vote == "yes":
-                    yes_votes += 1
-                else:
-                    assert vote == "no"
-                    no_votes += 1
-
-            # our new choice is...
-            if yes_votes != no_votes:
-                self._choice = "yes" if yes_votes > no_votes else "no"
-            dprint("New vote: %s" % self._choice)
-
+        # TODO: update.
