@@ -93,8 +93,8 @@ VIDEOHTTP_LISTENPORT = 6875
 SESSION_CHECKPOINT_INTERVAL = 1800.0 # seconds
 CHANNELMODE_REFRESH_INTERVAL = 5.0
 
-DEBUG = False
-ALLOW_MULTIPLE = False
+DEBUG = True
+ALLOW_MULTIPLE = True
 
 ##############################################################
 #
@@ -156,9 +156,9 @@ class ABCApp(wx.App):
         
     def OnInit(self):
         try:
-            bm = wx.Bitmap(os.path.join(self.installdir,'Tribler','Images','splash.jpg'),wx.BITMAP_TYPE_JPEG)
-            self.splash = wx.SplashScreen(bm, wx.SPLASH_CENTRE_ON_SCREEN|wx.SPLASH_NO_TIMEOUT, 1000, None, style = wx.SIMPLE_BORDER|wx.FRAME_NO_TASKBAR)
-            wx.Yield()
+#            bm = wx.Bitmap(os.path.join(self.installdir,'Tribler','Images','splash.jpg'),wx.BITMAP_TYPE_JPEG)
+#            self.splash = wx.SplashScreen(bm, wx.SPLASH_CENTRE_ON_SCREEN|wx.SPLASH_NO_TIMEOUT, 1000, None, style = wx.SIMPLE_BORDER|wx.FRAME_NO_TASKBAR)
+#            wx.Yield()
             
             
             import sys
@@ -289,12 +289,13 @@ class ABCApp(wx.App):
                 # wx < 2.7 don't like wx.Image.GetHandlers()
                 print_exc()
             
-            self.frame.Show(True)
-            self.splash.Destroy()
+# csko: Gui is hidden, for debugging
+#            self.frame.Show(True)
+#            self.splash.Destroy()
             
-            wx.CallAfter(self.startWithRightView)
-            wx.CallAfter(self.loadSessionCheckpoint)
-            wx.CallAfter(self.set_reputation)
+#            wx.CallAfter(self.startWithRightView)
+#            wx.CallAfter(self.loadSessionCheckpoint)
+#            wx.CallAfter(self.set_reputation)
             
             # start the torrent feed thread
             self.torrentfeed = TorrentFeedThread.getInstance()
