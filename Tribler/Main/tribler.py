@@ -88,10 +88,28 @@ from Tribler.Subscriptions.rss_client import TorrentFeedThread
 # one of those modules imports time as a module.
 from time import time, sleep
 
-I2I_LISTENPORT = 57891
-VIDEOHTTP_LISTENPORT = 6875
 SESSION_CHECKPOINT_INTERVAL = 1800.0 # seconds
 CHANNELMODE_REFRESH_INTERVAL = 5.0
+
+# csko: getting port numbers from runtime arguments
+if len(sys.argv) == 5:
+    I2I_LISTENPORT = int(sys.argv[4])
+    VIDEOHTTP_LISTENPORT = int(sys.argv[3])
+    DEFAULTPORT = int(sys.argv[2])
+
+    # Update configuration if it exists. Otherwise, DEFAULTPORT is being used as a default.
+    from Tribler.Core.SessionConfig import SessionStartupConfig
+    configpath = sys.argv[1] + "sessconfig.pickle"
+    config = SessionStartupConfig()
+    try:
+        config.load(configpath)
+    except IOError:
+        pass
+    config.set_listen_port(DEFAULTPORT)
+    config.save(configpath)
+else:
+    I2I_LISTENPORT = 57892
+    VIDEOHTTP_LISTENPORT = 6876
 
 DEBUG = True
 ALLOW_MULTIPLE = True

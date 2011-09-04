@@ -1,3 +1,5 @@
 Implementing some communities for Tribler client.
 
+This version is modified to allow running multiple full instances of Tribler. See start.sh.
+
 This was originally a copy of http://svn.tribler.org/abc/branches/release-5.4.x/.
