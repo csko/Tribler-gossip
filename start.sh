@@ -1,6 +1,6 @@
 #!/bin/bash
 
-N=1
+N=0
 
 export PYTHONPATH=.
 export TSTATEDIR="/home/csko/TriblerConfigs/$N/"

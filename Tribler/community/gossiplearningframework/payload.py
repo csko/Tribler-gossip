@@ -1,27 +1,28 @@
 from Tribler.Core.dispersy.payload import Payload
 
-class MixedPayload(Payload):
+class MessagePayload(Payload):
     class Implementation(Payload.Implementation):
-        def __init__(self, meta, text, number, array):
-            assert isinstance(text, unicode)
-            assert isinstance(number, float)
-            assert isinstance(array, list)
-            assert len(text.encode("UTF-8")) < 256
-            assert len(array) < 100
-            super(MixedPayload.Implementation, self).__init__(meta)
-            self._text = text
-            self._number = number
-            self._array = array
+        def __init__(self, meta, message):
+            # TODO: assertions on message
+            assert isinstance(message, GossipMessage)
+            super(MessagePayload.Implementation, self).__init__(meta)
+            self._message = message
 
         @property
-        def text(self):
-            return self._text
+        def message(self):
+            return self._message
 
-        @property
-        def number(self):
-            return self._number
+class GossipMessage:
+    pass
 
-        @property
-        def array(self):
-            return self._array
+class LinearMessage(GossipMessage):
 
+  def __init__(self):
+    self.w = []
+
+class TreeMessage(GossipMessage):
+
+  def __init__(self):
+    self.mu0 = 0
+    self.q = LinearMessage()
+    self.q.w = [15]

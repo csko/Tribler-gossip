@@ -1,5 +1,5 @@
 from conversion import Conversion
-from payload import MixedPayload
+from payload import MessagePayload, LinearMessage, GossipMessage
 
 from Tribler.Core.dispersy.authentication import MemberAuthentication
 from Tribler.Core.dispersy.community import Community
@@ -43,9 +43,8 @@ class VotingTestCommunity(Community):
         if __debug__: dprint(self._cid.encode("HEX"))
 
         # The (now static) message we will be sending. These parameters will be used to create the payload.
-        self._text = u"Test"
-        self._number = 123456.789
-        self._array = [1, 2, "abc", 5.0, [3, 4]]
+        self._message = LinearMessage()
+        self._message.w = [1,2]
 
         # Periodically we will send our data to ther node(s).
         self._dispersy.callback.register(self._periodically_send_model, delay=DELAY)
@@ -58,7 +57,7 @@ class VotingTestCommunity(Community):
                 DirectDistribution(),
 #                FullSyncDistribution(), # Full gossip
                 CommunityDestination(node_count=1), # Reach only one node each time.
-                MixedPayload(),
+                MessagePayload(),
                 self.check_model,
                 self.on_receive_model,
                 delay=DELAY)]
@@ -73,9 +72,7 @@ class VotingTestCommunity(Community):
             dprint(meta)
 
         # TODO: Reuse code?
-        assert isinstance(self._text, unicode)
-        assert isinstance(self._number, float)
-        assert isinstance(self._array, list)
+        assert isinstance(self._message, GossipMessage)
 
         # "Active thread", send a message and wait delta time.
         while True:
@@ -85,9 +82,9 @@ class VotingTestCommunity(Community):
 #                                     meta.distribution.implement(self.claim_global_time()),
                                      meta.destination.implement(),
 #                                     meta.destination.implement(True),
-                                     meta.payload.implement(self._text, self._number, self._array))
-#            self._dispersy.store_update_forward([message], False, False, True)
-            self._dispersy.store_update_forward([message], True, True, True) # For testing
+                                     meta.payload.implement(self._message))
+            self._dispersy.store_update_forward([message], False, False, True)
+#            self._dispersy.store_update_forward([message], True, True, True) # For testing
 
             # wait some time and make a new message
             yield DELAY
@@ -112,8 +109,6 @@ class VotingTestCommunity(Community):
             dprint("Message")
             dprint(message)
             dprint(message.payload)
-            dprint(("Received text:", message.payload.text))
-            dprint(("Received number:", message.payload.number))
-            dprint(("Received array:", message.payload.array))
-
+            dprint(("Received message:", message.payload.message))
+            dprint(message.payload.message.w)
         # TODO: update.
