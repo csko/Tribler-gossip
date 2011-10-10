@@ -28,9 +28,12 @@ from Tribler.Core.NATFirewall.UDPPuncture import UDPHandler
 from Tribler.Core.DecentralizedTracking import mainlineDHT
 from Tribler.Core.osutils import get_readable_torrent_name
 from Tribler.Core.DecentralizedTracking.MagnetLink.MagnetLink import MagnetHandler
+from Tribler.Core.dispersy.dprint import dprint
 import traceback
 
 from Tribler.community.simpledispersytest.community import SimpleDispersyTestCommunity
+from Tribler.community.gossiplearningframework.community import GossipLearningCommunity
+
 from Tribler.Core.dispersy.dispersy import Dispersy
 from Tribler.Core.dispersy.callback import Callback
 from Tribler.Core.dispersy.community import HardKilledCommunity
@@ -390,6 +393,12 @@ class TriblerLaunchMany(Thread):
             SimpleDispersyTestCommunity.load_hardcoded_community()
         except ValueError:
             SimpleDispersyTestCommunity.join_hardcoded_community(self.session.dispersy_member)
+
+        # test GossipLearningCommunity
+        try:
+            GossipLearningCommunity.load_hardcoded_community()
+        except ValueError:
+            GossipLearningCommunity.join_hardcoded_community(self.session.dispersy_member)
 
         # notify dispersy finished loading
         self.session.uch.notify(NTFY_DISPERSY, NTFY_STARTED, None)

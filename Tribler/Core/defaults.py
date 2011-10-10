@@ -20,6 +20,9 @@ import sys
 import os
 from simpledefs import *
 
+# csko: Take the default port from tribler.py
+#from Tribler.Main.tribler import DEFAULTPORT
+
 DEFAULTPORT=7760
 
 #
