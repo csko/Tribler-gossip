@@ -32,7 +32,7 @@ from Tribler.Core.dispersy.dprint import dprint
 import traceback
 
 from Tribler.community.simpledispersytest.community import SimpleDispersyTestCommunity
-from Tribler.community.gossiplearningframework.community import VotingTestCommunity
+from Tribler.community.gossiplearningframework.community import GossipLearningCommunity
 
 from Tribler.Core.dispersy.dispersy import Dispersy
 from Tribler.Core.dispersy.callback import Callback
@@ -394,11 +394,11 @@ class TriblerLaunchMany(Thread):
         except ValueError:
             SimpleDispersyTestCommunity.join_hardcoded_community(self.session.dispersy_member)
 
-        # test VotingTestCommunity
+        # test GossipLearningCommunity
         try:
-            VotingTestCommunity.load_hardcoded_community()
+            GossipLearningCommunity.load_hardcoded_community()
         except ValueError:
-            VotingTestCommunity.join_hardcoded_community(self.session.dispersy_member)
+            GossipLearningCommunity.join_hardcoded_community(self.session.dispersy_member)
 
         # notify dispersy finished loading
         self.session.uch.notify(NTFY_DISPERSY, NTFY_STARTED, None)
