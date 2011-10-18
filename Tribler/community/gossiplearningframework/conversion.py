@@ -4,7 +4,7 @@ import json
 
 from Tribler.Core.dispersy.message import DropPacket
 from Tribler.Core.dispersy.conversion import BinaryConversion
-from Tribler.community.gossiplearningframework.payload import GossipMessage
+from Tribler.community.gossiplearningframework.payload import *
 
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint

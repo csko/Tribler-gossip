@@ -15,7 +15,7 @@ from Tribler.Core.dispersy.message import Message, DelayMessageByProof
 from Tribler.Core.dispersy.resolution import LinearResolution
 from Tribler.Core.dispersy.destination import CommunityDestination
 
-# Send messages every 5 seconds. Default value.
+# Delay for each message.
 MSGDELAY=0.0
 
 if __debug__:
@@ -77,8 +77,8 @@ class AbstractGossipCommunity(Community):
                                    meta.destination.implement(),
 #                                   meta.destination.implement(True),
                                    meta.payload.implement(self._message)))
-#          self._dispersy.store_update_forward(send_messages, False, False, True)
-          self._dispersy.store_update_forward(send_messages, True, True, True) # For testing
+          self._dispersy.store_update_forward(send_messages, False, False, True)
+#          self._dispersy.store_update_forward(send_messages, True, True, True) # For testing
 
     def active_thread(self):
       raise NotImplementedError('active_thread')
