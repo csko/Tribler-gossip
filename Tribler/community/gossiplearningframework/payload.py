@@ -18,7 +18,8 @@ class GossipMessage:
 class LinearMessage(GossipMessage):
 
   def __init__(self):
-    self.w = []
+    self.w = [] # sparse vector
+    self.label = 0
 
 class TreeMessage(GossipMessage):
 

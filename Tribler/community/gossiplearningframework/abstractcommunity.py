@@ -22,9 +22,8 @@ if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
 
 class AbstractGossipCommunity(Community):
-    # Identifier used for 5.4.0 debugging
-    hardcoded_cid = "61d3ec235ebefc4b5ae1959619f33afb46b9729d".decode("HEX")
-    hardcoded_master_public_key = "3081a7301006072a8648ce3d020106052b810400270381920004054a2ad3d209398195ef97d34743a61a26cc2ba995827d4d06a58818f3ef64a8995ad308e68c54abb79fba03cfb55a4d37b902bc8fb4a5f5743a32df87dd1e2367ddf2f627fb2800036b9392afc9d05d72cd3e14f5b5348344293ffaadf37750bb4c4ee3c0c0bc46dc31aad4945c73aa5ca339b223ab0d84d5bcfff3f9a3d6c762ca4e1dc762a183d93454043d8fd3ea".decode("HEX")
+    hardcoded_cid = "0792e0a3741c52fbb25bcfd172b695ad3c67b8f8".decode("HEX")
+    hardcoded_master_public_key = "3081a7301006072a8648ce3d020106052b810400270381920004039a2b5690996f961998e72174a9cf3c28032de6e50c810cde0c87cdc49f1079130f7bcb756ee83ebf31d6d118877c2e0080c0eccfc7ea572225460834298e68d2d7a09824f2f0150718972591d6a6fcda45e9ac854d35af1e882891d690b2b2aa335203a69f09d5ee6884e0e85a1f0f0ae1e08f0cf7fbffd07394a0dac7b51e097cfebf9a463f64eeadbaa0c26c0660".decode("HEX")
 
     @classmethod
     def join_hardcoded_community(cls, my_member):
@@ -77,8 +76,8 @@ class AbstractGossipCommunity(Community):
                                    meta.destination.implement(),
 #                                   meta.destination.implement(True),
                                    meta.payload.implement(message)))
-          self._dispersy.store_update_forward(send_messages, False, False, True)
-#          self._dispersy.store_update_forward(send_messages, True, True, True) # For testing
+#          self._dispersy.store_update_forward(send_messages, False, False, True)
+          self._dispersy.store_update_forward(send_messages, True, True, True) # For testing
 
     def active_thread(self):
       raise NotImplementedError('active_thread')
