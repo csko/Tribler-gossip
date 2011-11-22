@@ -25,9 +25,9 @@ class SetupScript(ScriptBase):
         self._start_time = time()
         self.caller(self.setup)
         self.caller(self.sync)
-        self.caller(self.check_master_identity)
-        self.caller(self.check_permissions)
-        self.caller(self.check_my_member_identity)
+#        self.caller(self.check_master_identity)
+#        self.caller(self.check_permissions)
+#        self.caller(self.check_my_member_identity)
 
     def setup(self):
         """
@@ -225,12 +225,12 @@ class ObserverScript(SetupScript):
 
     def print_status(self):
         """
-        This will print the status of the model every minute.
+        This will print the status of the model every 10 seconds.
         """
         while True:
             dprint(self._community._message)
             dprint(self._community._message.w)
             dprint(self._community._message.age)
-            yield 1.0 # minute
+            yield 10.0 # seconds
 
         yield 1.0
