@@ -52,7 +52,7 @@ class GossipLearningCommunity(AbstractGossipCommunity):
     def check_model(self, messages):
         """
         One or more models have been received, we check them for validity.
-        This is a generator function and We can either forward a message or drop it.
+        This is a generator function and we can either forward a message or drop it.
         """
         for message in messages:
             if isinstance(message, GossipMessage):
@@ -93,3 +93,11 @@ class GossipLearningCommunity(AbstractGossipCommunity):
             dprint(wx)
             self._message.w = [w[i] + rate * (label - wx) * x[i] for i in range(len(w))]
             dprint(self._message.w)
+
+    def predict(self, x):
+      # Calculate w' * x.
+      w = self._message.w
+      wx = sum([wi * xi for (wi,xi) in zip(w, x)])
+
+      # Return sign(w' * x).
+      return 1.0 if wx >= 0 else 0.0

@@ -13,4 +13,4 @@ mkdir -p $TSTATEDIR
 
 echo "Running: python Tribler/Main/tribler.py $TSTATEDIR $TORRENTPORT $I2IPORT $VIDEOPORT"
 
-python Tribler/Main/tribler.py $TSTATEDIR $TORRENTPORT $I2IPORT $VIDEOPORT
+python2 Tribler/Main/tribler.py $TSTATEDIR $TORRENTPORT $I2IPORT $VIDEOPORT
