@@ -32,11 +32,16 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         if __debug__: dprint('gossiplearningcommunity' + self._cid.encode("HEX"))
 
         # The (now static) message we will be sending. These parameters will be used to create the payload.
-        self._message = LinearMessage()
-        self._message.w = [1, 2]
-        self._message.label = 0 # 0 or 1
 
-        self._age = 0
+        # x and y are stored only locally
+        # TODO: load from database
+        self._x = [3, 4]
+        self._y = 1.0
+
+        # Initial model
+        self._message = LinearMessage()
+        self._message.w = [0, 0]
+        self._message.age = 0
 
     def active_thread(self):
         # "Active thread", send a message and wait delta time.
@@ -51,11 +56,13 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         """
         for message in messages:
             if isinstance(message, GossipMessage):
-              label = message.payload.message.label
-              if not type(label) == int or label < 0:
-                yield DropMessage("Label must be a nonnegative integer in this protocol.")
+              age = message.payload.message.age
+              if not type(age) == int or age < 0:
+                yield DropMessage("Age must be a nonnegative integer in this protocol.")
               else:
                 yield message # Accept message.
+            else:
+              yield DropMessage("Message must be a Gossip Message")
 
     def on_receive_model(self, messages):
         """
@@ -68,22 +75,19 @@ class GossipLearningCommunity(AbstractGossipCommunity):
             dprint(("Received message:", message.payload.message))
             dprint(message.payload.message.w)
 
-            msg = message.payload.message # LinearMessage
+            msg = message.payload.message
 
             assert isinstance(msg, GossipMessage)
-            assert type(msg.label) == int
-            assert msg.label >= 0
 
-            # Performs the Adaline update: w_{i+1} = w_i + eta_i * (y - w' * x) * x. 
 
-            self._age += 1
-            rate = 1.0 / self._age
-            label = -1.0 if (msg.label == 0.0) else label
-            dprint(label)
+            # Set up some variables.
+            age = msg.age + 1
+            rate = 1.0 / age
+            x = self._x
+            label = self._y
 
-            # Calculate the update.
+            # Perform the Adaline update: w_{i+1} = w_i + eta_i * (y - w' * x) * x.
             # Assume the same size (TODO).
-            x = [3, 4]
             w = self._message.w
             wx = sum([wi * xi for (wi,xi) in zip(w, x)])
             dprint(wx)

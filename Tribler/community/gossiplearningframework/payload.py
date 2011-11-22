@@ -19,8 +19,9 @@ class LinearMessage(GossipMessage):
 
   def __init__(self):
     self.w = [] # sparse vector
-    self.label = 0
+    self.age = 0
 
+# Example complex type
 class TreeMessage(GossipMessage):
 
   def __init__(self):
