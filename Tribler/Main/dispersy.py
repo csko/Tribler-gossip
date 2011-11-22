@@ -90,7 +90,7 @@ def main():
 
     def start():
         # start Dispersy
-        dispersy = Dispersy.get_instance(callback, opt.statedir)
+        dispersy = Dispersy.get_instance(callback, unicode(opt.statedir))
         dispersy.socket = DispersySocket(rawserver, dispersy, opt.port, opt.ip)
 
         # load the script parser
@@ -124,8 +124,7 @@ def main():
                 script.add("simpledispersytest-destroy-community", KillCommunityScript, script_kargs, include_with_all=False)
 
             if not opt.disable_simple_dispersy_test_script:
-                from Tribler.community.gossiplearningframework.script import GenerateMessagesScript, ObserverScript
-                script.add("gossiplearningframework-generate-messages", GenerateMessagesScript, script_kargs, include_with_all=False)
+                from Tribler.community.gossiplearningframework.script import ObserverScript
                 script.add("gossiplearningframework-observe", ObserverScript, script_kargs, include_with_all=False)
 
             # if not opt.disable_allchannel_script:

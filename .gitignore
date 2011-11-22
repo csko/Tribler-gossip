@@ -2,4 +2,5 @@
 experiment/*
 dispersy.db
 dispersy.db-journal
-instances/*
+states/*
+

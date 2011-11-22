@@ -1,9 +1,8 @@
 #
-# python Tribler/Main/dispersy.py --script gossiplearningframework-generate-messages
 # python Tribler/Main/dispersy.py --script gossiplearningframework-observe
 #
 # Ensure that the files experiment/gossip_ec_private_key and
-# experiment/gossip_ec_master_private_key are available
+# experiment/gossip_ec_master_private_key are available.
 #
 
 from hashlib import sha1
@@ -18,16 +17,17 @@ from Tribler.Core.dispersy.script import ScriptBase
 from Tribler.Core.dispersy.member import MyMember, Member
 from Tribler.Core.dispersy.dprint import dprint
 
-hardcoded_member_public_keys = {'M1': 'x'}
+hardcoded_member_public_keys = {'M1': "3081a7301006072a8648ce3d020106052b81040027038192000403eb7eac1ae9171ff86e3afcfce23bd114d91cbcfccee92adc6b4679745b6b09404e52c00837e074097d7731967acff02b2a596ed84ba3db4ed1b8cd94ddfa2c63d8867a08453a7704de15ffd23af5db3c9d8e1e941ddad11eb5a037ed2e990090b6921ecb26385fbd55496562fe16432cc48aa65aabeccdee522a0b305450182e148722e0712edebe78f6a0818ba677".decode("HEX"),
+                                'M2': "3081a7301006072a8648ce3d020106052b810400270381920004031991e59f9e9eb7222b00a99da799764145de103a140c0f8b4fcd0c45742367bef9af9293c101ceff681d390873af0763bab68b6ff06e8333c48f77ae0ffc9a089681ffb57ecdc007c92770faff1d5d097b1ebb8126d45f2da189256abf70103cd388b736eee41fb65113fe064d7987e100fb10c8072ff046de01a8621ec1ee773046a3b384430c7791d8fbd0ce6ec9".decode("HEX")}
 
 class SetupScript(ScriptBase):
     def run(self):
         self._start_time = time()
         self.caller(self.setup)
         self.caller(self.sync)
-#        self.caller(self.check_master_identity)
-#        self.caller(self.check_permissions)
-#        self.caller(self.check_my_member_identity)
+        self.caller(self.check_master_identity)
+        self.caller(self.check_permissions)
+        self.caller(self.check_my_member_identity)
 
     def setup(self):
         """
@@ -218,22 +218,6 @@ class SetupScript(ScriptBase):
 
         yield 1.0
 
-class GenerateMessagesScript(SetupScript):
-    def run(self):
-        super(GenerateMessagesScript, self).run()
-        self.caller(self.create_messages)
-
-    def create_messages(self):
-        """
-        We will create a new last-1-subjective-sync message every 3 minutes.
-        """
-        while True:
-            # create a new last-1-sync message every 6 minutes
-            self._community.create_last_1_subjective_sync(u"last-1-subjective-sync; start:%f; at:%f; creator:%s" % (self._start_time, time(), self._community.my_member.mid.encode("HEX")))
-            yield 60.0 * 3
-
-        yield 1.0
-
 class ObserverScript(SetupScript):
     def run(self):
         super(ObserverScript, self).run()
@@ -244,9 +228,9 @@ class ObserverScript(SetupScript):
         This will print the status of the model every minute.
         """
         while True:
-            print self._community._message
-            print self._community._message.w
-            print self._community._message.age
+            dprint(self._community._message)
+            dprint(self._community._message.w)
+            dprint(self._community._message.age)
             yield 1.0 # minute
 
         yield 1.0
