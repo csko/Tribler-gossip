@@ -1,5 +1,6 @@
 #
 # python Tribler/Main/dispersy.py --script gossiplearningframework-generate-messages
+# python Tribler/Main/dispersy.py --script gossiplearningframework-observe
 #
 # Ensure that the files experiment/gossip_ec_private_key and
 # experiment/gossip_ec_master_private_key are available
@@ -24,9 +25,9 @@ class SetupScript(ScriptBase):
         self._start_time = time()
         self.caller(self.setup)
         self.caller(self.sync)
-        self.caller(self.check_master_identity)
-        self.caller(self.check_permissions)
-        self.caller(self.check_my_member_identity)
+#        self.caller(self.check_master_identity)
+#        self.caller(self.check_permissions)
+#        self.caller(self.check_my_member_identity)
 
     def setup(self):
         """
@@ -63,13 +64,13 @@ class SetupScript(ScriptBase):
 
             # insert entries in the dispersy database to join the community
             with self._dispersy_database as database:
-                database.execute(u"INSERT INTO community (user, classification, cid, public_key) VALUES(?, ?, ?, ?)", (my_member.database_id, SimpleDispersyTestCommunity.get_classification(), buffer(SimpleDispersyTestCommunity.hardcoded_cid), buffer(SimpleDispersyTestCommunity.hardcoded_master_public_key)))
+                database.execute(u"INSERT INTO community (user, classification, cid, public_key) VALUES(?, ?, ?, ?)", (my_member.database_id, GossipLearningCommunity.get_classification(), buffer(GossipLearningCommunity.hardcoded_cid), buffer(GossipLearningCommunity.hardcoded_master_public_key)))
                 database_id = self._dispersy_database.last_insert_rowid
-                database.execute(u"INSERT INTO user (mid, public_key) VALUES(?, ?)", (buffer(SimpleDispersyTestCommunity.hardcoded_cid), buffer(SimpleDispersyTestCommunity.hardcoded_master_public_key)))
-                database.execute(u"INSERT INTO key (public_key, private_key) VALUES(?, ?)", (buffer(SimpleDispersyTestCommunity.hardcoded_master_public_key), buffer(master_private_key)))
+                database.execute(u"INSERT INTO user (mid, public_key) VALUES(?, ?)", (buffer(GossipLearningCommunity.hardcoded_cid), buffer(GossipLearningCommunity.hardcoded_master_public_key)))
+                database.execute(u"INSERT INTO key (public_key, private_key) VALUES(?, ?)", (buffer(GossipLearningCommunity.hardcoded_master_public_key), buffer(master_private_key)))
                 database.execute(u"INSERT INTO candidate (community, host, port, incoming_time, outgoing_time) SELECT ?, host, port, incoming_time, outgoing_time FROM candidate WHERE community = 0", (database_id,))
 
-            self._community = SimpleDispersyTestCommunity.load_community(SimpleDispersyTestCommunity.hardcoded_cid, SimpleDispersyTestCommunity.hardcoded_master_public_key)
+            self._community = GossipLearningCommunity.load_community(GossipLearningCommunity.hardcoded_cid, GossipLearningCommunity.hardcoded_master_public_key)
 
         yield 1.0
 
@@ -230,5 +231,22 @@ class GenerateMessagesScript(SetupScript):
             # create a new last-1-sync message every 6 minutes
             self._community.create_last_1_subjective_sync(u"last-1-subjective-sync; start:%f; at:%f; creator:%s" % (self._start_time, time(), self._community.my_member.mid.encode("HEX")))
             yield 60.0 * 3
+
+        yield 1.0
+
+class ObserverScript(SetupScript):
+    def run(self):
+        super(ObserverScript, self).run()
+        self.caller(self.print_status)
+
+    def print_status(self):
+        """
+        This will print the status of the model every minute.
+        """
+        while True:
+            print self._community._message
+            print self._community._message.w
+            print self._community._message.age
+            yield 1.0 # minute
 
         yield 1.0

@@ -76,8 +76,8 @@ class AbstractGossipCommunity(Community):
                                    meta.destination.implement(),
 #                                   meta.destination.implement(True),
                                    meta.payload.implement(message)))
-#          self._dispersy.store_update_forward(send_messages, False, False, True)
-          self._dispersy.store_update_forward(send_messages, True, True, True) # For testing
+          self._dispersy.store_update_forward(send_messages, False, False, True)
+#          self._dispersy.store_update_forward(send_messages, True, True, True) # For testing
 
     def active_thread(self):
       raise NotImplementedError('active_thread')
