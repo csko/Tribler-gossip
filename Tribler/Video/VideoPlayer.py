@@ -63,7 +63,7 @@ class VideoPlayer:
         self.utility = utility # TEMPARNO: make sure only used for language strings
 
         self.preferredplaybackmode = preferredplaybackmode
-        self.determine_playbackmode()
+        #self.determine_playbackmode()
 
         if self.playbackmode == PLAYBACKMODE_INTERNAL:
             # The python-vlc bindings. Created only once at the moment,
@@ -1006,6 +1006,7 @@ def return_feasible_playback_modes(syspath):
             import Tribler.vlc as vlc
         
         # Niels: check version of vlc
+        return []
         version = vlc.libvlc_get_version()
         subversions = version.split(".")
         if len(subversions) > 2:
