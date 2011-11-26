@@ -1,5 +1,5 @@
 *.pyc
-experiment/*
+experiment/gossip*
 dispersy.db
 dispersy.db-journal
 states/*
