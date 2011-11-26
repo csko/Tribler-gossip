@@ -218,19 +218,94 @@ class SetupScript(ScriptBase):
 
         yield 1.0
 
+# TODO: rename: SetupScript/ControllerScript/ExperimentScript?
+# TODO: proper logging
+# TODO: whole database should not be loaded into memory in this script
+# TODO: only works on IRIS
 class ObserverScript(SetupScript):
     def run(self):
         super(ObserverScript, self).run()
+        self._database = []
+        self.load_database("experiment/db/iris_setosa_versicolor_train.dat")
+        self.caller(self.pick_instances)
         self.caller(self.print_status)
 
     def print_status(self):
         """
         This will print the status of the model every 10 seconds.
         """
-        while True:
-            dprint(self._community._message)
-            dprint(self._community._message.w)
-            dprint(self._community._message.age)
-            yield 10.0 # seconds
+        member_name = self._kargs["hardcoded_member"]
+        mid = int(member_name[1:]) - 1
+
+        logfile = "experiment/logs/%06d_setosa_versicolor.log" % mid
+        with open(logfile, "w") as f:
+            print >>f, "# timestamp member_id age mae"
+            while True:
+                print >>f, int(time()), mid,
+                print >>f, self._community._message.age, self.predict()
+                f.flush()
+                yield 10.0 # seconds
 
         yield 1.0
+
+
+    def load_database(self, fname):
+        """
+        Load the whole dataset.
+        """
+        data = []
+        with open(fname) as f:
+            for line in f:
+                x = {}
+
+                vals = line[:-1].split()
+                y = int(vals[0])
+                vals = vals[1:]
+
+                for i in vals:
+                    k, v = i.split(":")
+                    x[int(k)] = float(v)
+
+                data.append((x, y))
+        print "Database loaded."
+        self._database = data
+
+    def pick_instances(self):
+        """
+        Choose one or more instances to be placed on the client based on the member ID.
+        """
+
+        member_name = self._kargs["hardcoded_member"]
+        mid = int(member_name[1:]) - 1
+
+        # For now, choose only one instance based on the member id.
+        data = self._database[mid]
+
+        # Suppose there are no missing values.
+        self._community.x = []
+        for k, v in sorted(data[0].items()):
+            self._community.x.append(v)
+
+        self._community.y = data[1]
+
+        # Initialize the model also.
+        self._community.w = [0 for i in range(len(self._community.x))]
+
+        print "One instance picked."
+        yield 1.0
+
+    def predict(self):
+        """
+        Predicts on the whole dataset and outputs the results for further analysis.
+        """
+        mae = 0
+        for (x, y) in self._database:
+            ypred = int(self._community.predict(x))
+            # 0-1 error
+            if ypred != y:
+                mae += 1
+        mae /= 1.0 * len(self._database)
+
+        return mae
+
+

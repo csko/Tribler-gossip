@@ -1,6 +1,6 @@
 #!/bin/bash
 
-N=0
+N=$1
 
 PORT=`expr 20000 + $N`
 MEMBER=M`expr 1 + $N`
