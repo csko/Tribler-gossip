@@ -8,6 +8,7 @@
 from hashlib import sha1
 from time import time
 from os.path import expanduser
+import sys
 
 from community import GossipLearningCommunity
 
@@ -59,7 +60,7 @@ class SetupScript(ScriptBase):
             # NEEDS TO BE REFLECTED HERE ASWELL
 
             # obtain the hardcoded_private_key for my_member from disk
-            pem = open(expanduser("experiment/keys/public_M%05d.pem" % i), "r").read()
+            pem = open(expanduser("experiment/keys/private_M%05d.pem" % i), "r").read()
             ec = ec_from_private_pem(pem)
             private_key = ec_to_private_bin(ec)
             my_member = MyMember(hardcoded_public_key, private_key)
@@ -252,6 +253,8 @@ class ObserverScript(SetupScript):
                 print >>f, int(time()), mid,
                 print >>f, self._community._message.age, self.predict()
                 f.flush()
+                print self._community._message.w, self._community._message.age, self._community.x
+                sys.stdout.flush()
                 yield 10.0 # seconds
 
         yield 1.0
@@ -276,7 +279,7 @@ class ObserverScript(SetupScript):
                     k, v = i.split(":")
                     x[int(k)] = float(v)
 
-                eval_data.append((x, y))
+                train_data.append((x, y))
 
         with open("experiment/db/%s_eval.dat" % fname) as f:
             for line in f:
@@ -290,7 +293,7 @@ class ObserverScript(SetupScript):
                     k, v = i.split(":")
                     x[int(k)] = float(v)
 
-                train_data.append((x, y))
+                eval_data.append((x, y))
 
         print "Database loaded."
 
