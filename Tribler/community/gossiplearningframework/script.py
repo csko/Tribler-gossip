@@ -225,8 +225,9 @@ class SetupScript(ScriptBase):
 class ObserverScript(SetupScript):
     def run(self):
         super(ObserverScript, self).run()
-        self._database = []
-        self.load_database("experiment/db/iris_setosa_versicolor_train.dat")
+        self._train_database = []
+        self._eval_database = []
+        self.load_database("iris_setosa_versicolor")
         self.caller(self.pick_instances)
         self.caller(self.print_status)
 
@@ -253,8 +254,10 @@ class ObserverScript(SetupScript):
         """
         Load the whole dataset.
         """
-        data = []
-        with open(fname) as f:
+        train_data = []
+        eval_data = []
+
+        with open("experiment/db/%s_train.dat" % fname) as f:
             for line in f:
                 x = {}
 
@@ -266,9 +269,26 @@ class ObserverScript(SetupScript):
                     k, v = i.split(":")
                     x[int(k)] = float(v)
 
-                data.append((x, y))
+                eval_data.append((x, y))
+
+        with open("experiment/db/%s_eval.dat" % fname) as f:
+            for line in f:
+                x = {}
+
+                vals = line[:-1].split()
+                y = int(vals[0])
+                vals = vals[1:]
+
+                for i in vals:
+                    k, v = i.split(":")
+                    x[int(k)] = float(v)
+
+                train_data.append((x, y))
+
         print "Database loaded."
-        self._database = data
+
+        self._train_database = train_data
+        self._eval_database = eval_data
 
     def pick_instances(self):
         """
@@ -279,7 +299,7 @@ class ObserverScript(SetupScript):
         mid = int(member_name[1:]) - 1
 
         # For now, choose only one instance based on the member id.
-        data = self._database[mid]
+        data = self._train_database[mid % len(self._train_database)]
 
         # Suppose there are no missing values.
         self._community.x = []
@@ -299,13 +319,12 @@ class ObserverScript(SetupScript):
         Predicts on the whole dataset and outputs the results for further analysis.
         """
         mae = 0
-        for (x, y) in self._database:
+        for (x, y) in self._eval_database:
             ypred = int(self._community.predict(x))
             # 0-1 error
             if ypred != y:
                 mae += 1
-        mae /= 1.0 * len(self._database)
+        mae /= 1.0 * len(self._eval_database)
 
         return mae
-
 

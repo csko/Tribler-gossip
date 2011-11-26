@@ -55,14 +55,15 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         This is a generator function and we can either forward a message or drop it.
         """
         for message in messages:
-            if isinstance(message, GossipMessage):
+            print message
+            if isinstance(message.payload.message, GossipMessage):
               age = message.payload.message.age
               if not type(age) == int or age < 0:
-                yield DropMessage("Age must be a nonnegative integer in this protocol.")
+                yield DropMessage(message, "Age must be a nonnegative integer in this protocol.")
               else:
                 yield message # Accept message.
             else:
-              yield DropMessage("Message must be a Gossip Message")
+              yield DropMessage(message, "Message must be a Gossip Message")
 
     def on_receive_model(self, messages):
         """
