@@ -1,5 +1,6 @@
 *.pyc
-experiment/gossip*
+experiment/keys/private_
+experiment/gossip_ec_master_private_key*
 dispersy.db
 dispersy.db-journal
 states/*

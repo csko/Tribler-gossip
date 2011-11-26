@@ -12,13 +12,20 @@ from os.path import expanduser
 from community import GossipLearningCommunity
 
 from Tribler.Core.dispersy.resolution import PublicResolution
-from Tribler.Core.dispersy.crypto import ec_to_private_bin, ec_from_private_pem
+from Tribler.Core.dispersy.crypto import ec_to_private_bin, ec_from_private_pem, ec_from_public_pem, ec_to_public_bin
 from Tribler.Core.dispersy.script import ScriptBase
 from Tribler.Core.dispersy.member import MyMember, Member
 from Tribler.Core.dispersy.dprint import dprint
 
-hardcoded_member_public_keys = {'M1': "3081a7301006072a8648ce3d020106052b81040027038192000403eb7eac1ae9171ff86e3afcfce23bd114d91cbcfccee92adc6b4679745b6b09404e52c00837e074097d7731967acff02b2a596ed84ba3db4ed1b8cd94ddfa2c63d8867a08453a7704de15ffd23af5db3c9d8e1e941ddad11eb5a037ed2e990090b6921ecb26385fbd55496562fe16432cc48aa65aabeccdee522a0b305450182e148722e0712edebe78f6a0818ba677".decode("HEX"),
-                                'M2': "3081a7301006072a8648ce3d020106052b810400270381920004031991e59f9e9eb7222b00a99da799764145de103a140c0f8b4fcd0c45742367bef9af9293c101ceff681d390873af0763bab68b6ff06e8333c48f77ae0ffc9a089681ffb57ecdc007c92770faff1d5d097b1ebb8126d45f2da189256abf70103cd388b736eee41fb65113fe064d7987e100fb10c8072ff046de01a8621ec1ee773046a3b384430c7791d8fbd0ce6ec9".decode("HEX")}
+hardcoded_member_public_keys = {}
+
+# Load the hardcoded member public keys
+NUMPEERS=100
+
+for i in range(1, NUMPEERS+1):
+    pem = open(expanduser("experiment/keys/public_M%05d.pem" % i), "r").read()
+    ec = ec_from_public_pem(pem)
+    hardcoded_member_public_keys['M%d' % i] = ec_to_public_bin(ec)
 
 class SetupScript(ScriptBase):
     def run(self):
@@ -52,7 +59,7 @@ class SetupScript(ScriptBase):
             # NEEDS TO BE REFLECTED HERE ASWELL
 
             # obtain the hardcoded_private_key for my_member from disk
-            pem = open(expanduser("experiment/gossip_ec_private_key_%s" % member_name), "r").read()
+            pem = open(expanduser("experiment/keys/public_M%05d.pem" % i), "r").read()
             ec = ec_from_private_pem(pem)
             private_key = ec_to_private_bin(ec)
             my_member = MyMember(hardcoded_public_key, private_key)
@@ -238,7 +245,7 @@ class ObserverScript(SetupScript):
         member_name = self._kargs["hardcoded_member"]
         mid = int(member_name[1:]) - 1
 
-        logfile = "experiment/logs/%06d_setosa_versicolor.log" % mid
+        logfile = "experiment/logs/%05d_setosa_versicolor.log" % mid
         with open(logfile, "w") as f:
             print >>f, "# timestamp member_id age mae"
             while True:

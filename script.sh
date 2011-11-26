@@ -6,6 +6,7 @@ PORT=`expr 20000 + $N`
 MEMBER=M`expr 1 + $N`
 STATE="states/`expr 1 + $N`/"
 
+mkdir -p experiment/logs/
 mkdir -p "$STATE"
 
 export PYTHONPATH=.
