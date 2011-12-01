@@ -17,10 +17,10 @@ from Tribler.Core.dispersy.resolution import LinearResolution
 from Tribler.Core.dispersy.destination import CommunityDestination
 
 # Send messages every 3 seconds.
-DELAY=3.0
+DELAY=5.0
 
-# Start after 1 second.
-INITIALDELAY=1.0
+# Start after 15 seconds.
+INITIALDELAY=15.0
 
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
@@ -31,12 +31,14 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         super(GossipLearningCommunity, self).__init__(cid, master_public_key, INITIALDELAY)
         if __debug__: dprint('gossiplearningcommunity' + self._cid.encode("HEX"))
 
-        # The (now static) message we will be sending. These parameters will be used to create the payload.
+        # Stats
+        self._msg_count = 0
+
+        # They should be loaded from a database.
 
         # x and y are stored only locally
-        # TODO: load from database
-        self._x = [3, 4]
-        self._y = 1.0
+#        self._x = [3, 4]
+#        self._y = 1.0
 
         # Initial model
         self._message = LinearMessage()
@@ -70,6 +72,7 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         One or more models have been received from other peers so we update.
         """
         for message in messages:
+            self._msg_count += 1
             dprint("Message")
             dprint(message)
             dprint(message.payload)

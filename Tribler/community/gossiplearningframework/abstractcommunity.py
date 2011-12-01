@@ -16,7 +16,7 @@ from Tribler.Core.dispersy.resolution import LinearResolution
 from Tribler.Core.dispersy.destination import CommunityDestination
 
 # Delay for each message.
-MSGDELAY=0.0
+MSGDELAY=1.0
 
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint

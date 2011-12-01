@@ -12,4 +12,4 @@ mkdir -p "$STATE"
 export PYTHONPATH=.
 CMD="python2 Tribler/Main/dispersy.py --script gossiplearningframework-observe --script-args hardcoded_member=$MEMBER --port=$PORT --statedir=$STATE"
 echo $CMD
-$CMD
+$CMD >logs/$N.log 2>logs/$N-error.log

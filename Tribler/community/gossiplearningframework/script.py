@@ -248,13 +248,13 @@ class ObserverScript(SetupScript):
 
         logfile = "experiment/logs/%05d_setosa_versicolor.log" % mid
         with open(logfile, "w") as f:
-            print >>f, "# timestamp member_id age mae"
+            print >>f, "# timestamp member_id age mae msg_count"
             while True:
                 print >>f, int(time()), mid,
-                print >>f, self._community._message.age, self.predict()
+                print >>f, self._community._message.age, self.predict(), self._community._msg_count
                 f.flush()
-                print self._community._message.w, self._community._message.age, self._community.x
-                sys.stdout.flush()
+#                print self._community._message.w, self._community._message.age, self._community.x
+#                sys.stdout.flush()
                 yield 10.0 # seconds
 
         yield 1.0
