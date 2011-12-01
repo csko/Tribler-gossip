@@ -16,8 +16,8 @@ from Tribler.Core.dispersy.message import Message, DelayMessageByProof
 from Tribler.Core.dispersy.resolution import LinearResolution
 from Tribler.Core.dispersy.destination import CommunityDestination
 
-# Send messages every 3 seconds.
-DELAY=5.0
+# Send messages every 2 seconds.
+DELAY=2.0
 
 # Start after 15 seconds.
 INITIALDELAY=15.0

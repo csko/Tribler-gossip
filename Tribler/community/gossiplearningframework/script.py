@@ -61,7 +61,7 @@ class SetupScript(ScriptBase):
             # NEEDS TO BE REFLECTED HERE ASWELL
 
             # obtain the hardcoded_private_key for my_member from disk
-            pem = open(expanduser("experiment/keys/private_M%05d.pem" % mid), "r").read()
+            pem = open(expanduser("experiment/keys/private_M%05d.pem" % (mid + 1)), "r").read()
             ec = ec_from_private_pem(pem)
             private_key = ec_to_private_bin(ec)
             my_member = MyMember(hardcoded_public_key, private_key)
