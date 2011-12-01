@@ -47,6 +47,7 @@ class SetupScript(ScriptBase):
         assert self._kargs["hardcoded_member"] in hardcoded_member_public_keys, "give --script-args hardcoded_member=MEMBER"
 
         member_name = self._kargs["hardcoded_member"]
+        mid = int(member_name[1:]) - 1
         hardcoded_public_key = hardcoded_member_public_keys[member_name]
         hardcoded_mid = sha1(hardcoded_public_key).digest()
 
@@ -60,7 +61,7 @@ class SetupScript(ScriptBase):
             # NEEDS TO BE REFLECTED HERE ASWELL
 
             # obtain the hardcoded_private_key for my_member from disk
-            pem = open(expanduser("experiment/keys/private_M%05d.pem" % i), "r").read()
+            pem = open(expanduser("experiment/keys/private_M%05d.pem" % mid), "r").read()
             ec = ec_from_private_pem(pem)
             private_key = ec_to_private_bin(ec)
             my_member = MyMember(hardcoded_public_key, private_key)
@@ -253,7 +254,7 @@ class ObserverScript(SetupScript):
                 print >>f, int(time()), mid,
                 print >>f, self._community._message.age, self.predict(), self._community._msg_count
                 f.flush()
-#                print self._community._message.w, self._community._message.age, self._community.x
+#                print self._community._message.w, self._community._message.age, self._community._x
 #                sys.stdout.flush()
                 yield 10.0 # seconds
 
@@ -312,14 +313,14 @@ class ObserverScript(SetupScript):
         data = self._train_database[mid % len(self._train_database)]
 
         # Suppose there are no missing values.
-        self._community.x = []
+        self._community._x = []
         for k, v in sorted(data[0].items()):
-            self._community.x.append(v)
+            self._community._x.append(v)
 
-        self._community.y = data[1]
+        self._community._y = data[1]
 
         # Initialize the model also.
-        self._community.w = [0 for i in range(len(self._community.x))]
+        self._community._w = [0 for i in range(len(self._community._x))]
 
         print "One instance picked."
         yield 1.0

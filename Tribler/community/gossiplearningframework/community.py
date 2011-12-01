@@ -37,12 +37,12 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         # They should be loaded from a database.
 
         # x and y are stored only locally
-#        self._x = [3, 4]
-#        self._y = 1.0
+        self._x = None
+        self._y = None
 
         # Initial model
         self._message = LinearMessage()
-        self._message.w = [0, 0]
+        self._message.w = [0, 0, 0, 0]
         self._message.age = 0
 
     def active_thread(self):
@@ -78,11 +78,16 @@ class GossipLearningCommunity(AbstractGossipCommunity):
             dprint(message.payload)
             dprint(("Received message:", message.payload.message))
             dprint(message.payload.message.w)
+            dprint(self._x)
 
             msg = message.payload.message
 
             assert isinstance(msg, GossipMessage)
 
+            # Database not yet loaded.
+            if self._x == None:
+              dprint("Database not yet loaded.")
+              continue
 
             # Set up some variables.
             age = msg.age + 1
