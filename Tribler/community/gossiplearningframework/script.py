@@ -280,7 +280,12 @@ class ObserverScript(SetupScript):
                     k, v = i.split(":")
                     x[int(k)] = float(v)
 
-                train_data.append((x, y))
+                # Suppose there are no missing values.
+                x2 = []
+                for k, v in sorted(x.items()):
+                    x2.append(v)
+
+                train_data.append((x2, y))
 
         with open("experiment/db/%s_eval.dat" % fname) as f:
             for line in f:
@@ -294,7 +299,12 @@ class ObserverScript(SetupScript):
                     k, v = i.split(":")
                     x[int(k)] = float(v)
 
-                eval_data.append((x, y))
+                # Suppose there are no missing values.
+                x2 = []
+                for k, v in sorted(x.items()):
+                    x2.append(v)
+
+                eval_data.append((x2, y))
 
         print "Database loaded."
 
@@ -312,11 +322,7 @@ class ObserverScript(SetupScript):
         # For now, choose only one instance based on the member id.
         data = self._train_database[mid % len(self._train_database)]
 
-        # Suppose there are no missing values.
-        self._community._x = []
-        for k, v in sorted(data[0].items()):
-            self._community._x.append(v)
-
+        self._community._x = data[0]
         self._community._y = data[1]
 
         # Initialize the model also.

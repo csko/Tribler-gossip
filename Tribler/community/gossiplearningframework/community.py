@@ -91,7 +91,7 @@ class GossipLearningCommunity(AbstractGossipCommunity):
 
             # Set up some variables.
             x = self._x
-            label = -1.0 if self._y == 0 else 1.0
+            label = -1.0 if self._y == 0 else self._y
 
             age = msg.age + 1
             w = msg.w
@@ -106,9 +106,10 @@ class GossipLearningCommunity(AbstractGossipCommunity):
             dprint(self._message.w)
 
     def predict(self, x):
+      dprint(('predict', x))
       # Calculate w' * x.
       w = self._message.w
       wx = sum([wi * xi for (wi,xi) in zip(w, x)])
 
       # Return sign(w' * x).
-      return 1.0 if wx >= 0 else -1.0
+      return 1.0 if wx >= 0 else 0.0
