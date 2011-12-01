@@ -55,20 +55,22 @@ def load_data():
             f.readline()
             for line in f:
                 row = line[:-1].split()
-                data.append((int(row[0]), int(row[1]), float(row[3])))
+                data.append((int(row[0]), int(row[1]), float(row[3]), int(row[4])))
     return data
 
 # TODO: do a faster, but not so accurate version using a fix set of intervals
 
 def print_stats(t, s):
-    stats = get_stats(s.values())
+    stats = get_stats([x[0] for x in s.values()])
     vals = [stats['min'], stats['max'], stats['avg']]
-    print t, " ".join([str(x) for x in vals])
+    stats2 = get_stats([x[1] for x in s.values()])
+    vals2 = [stats2['min'], stats2['max'], stats2['med']]
+    print t, " ".join([str(x) for x in vals]), " ".join([str(x) for x in vals2])
 
 def accurate_stats():
     peer_data = defaultdict(float) # maps a peer ID to their last known prediction value
 
-    print "# timestamp min max avg"
+    print "# timestamp min_mae max_mae avg_mae min_msg_count max_msg_count med_msg_count"
 
     first_t = None
     for d in sorted(data):
@@ -80,7 +82,7 @@ def accurate_stats():
         else:
             t = d[0] - first_t
 
-        peer_data[d[1]] = d[2]
+        peer_data[d[1]] = (d[2], d[3]) # mae, msg_count
         print_stats(t, peer_data)
 
 data = load_data()
