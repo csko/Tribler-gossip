@@ -91,25 +91,25 @@ class GossipLearningCommunity(AbstractGossipCommunity):
 
             # Set up some variables.
             x = self._x
-            label = -1.0 if self._y == 0 else self._y
+            label = -1.0 if self._y == 0 else 1.0
 
             age = msg.age + 1
             w = msg.w
             rate = 1.0 / age
+            lam = 7
 
-            # Perform the Adaline update: w_{i+1} = w_i + eta_i * (y - w' * x) * x.
+            # Perform the Adaline update: w_{i+1} = w_i + eta * (y - w_i' * x) * x.
             # Assume the same size (TODO).
             wx = sum([wi * xi for (wi,xi) in zip(w, x)])
             dprint(wx)
-            self._message.w = [w[i] + rate * (label - wx) * x[i] for i in range(len(w))]
+            self._message.w = [(1-rate) * w[i] + rate / lam * (label - wx) * x[i] for i in range(len(w))]
             self._message.age = age
             dprint(self._message.w)
 
     def predict(self, x):
-      dprint(('predict', x))
       # Calculate w' * x.
       w = self._message.w
       wx = sum([wi * xi for (wi,xi) in zip(w, x)])
 
       # Return sign(w' * x).
-      return 1.0 if wx >= 0 else 0.0
+      return 1 if wx >= 0 else 0

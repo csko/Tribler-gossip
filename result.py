@@ -77,10 +77,10 @@ def accurate_stats():
         t = d[0]
 
         if first_t == None:
-            t = 0
+            t = 1
             first_t = d[0]
         else:
-            t = d[0] - first_t
+            t = d[0] - first_t + 1
 
         peer_data[d[1]] = (d[2], d[3]) # mae, msg_count
         print_stats(t, peer_data)

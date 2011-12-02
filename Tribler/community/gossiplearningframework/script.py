@@ -252,7 +252,7 @@ class ObserverScript(SetupScript):
             print >>f, "# timestamp member_id age mae msg_count"
             while True:
                 print >>f, int(time()), mid,
-                print >>f, self._community._message.age, self.predict(), self._community._msg_count
+                print >>f, self._community._message.age, self.predict(), self._community._msg_count, " ".join([str(x) for x in self._community._message.w])
                 f.flush()
 #                print self._community._message.w, self._community._message.age, self._community._x
 #                sys.stdout.flush()
@@ -328,13 +328,14 @@ class ObserverScript(SetupScript):
         # Initialize the model also.
         self._community._w = [0 for i in range(len(self._community._x))]
 
-        print "One instance picked."
+        dprint("One instance picked.")
         yield 1.0
 
     def predict(self):
         """
         Predicts on the whole dataset and outputs the results for further analysis.
         """
+        dprint("pred", self._community._message.w)
         mae = 0
         for (x, y) in self._eval_database:
             ypred = int(self._community.predict(x))
