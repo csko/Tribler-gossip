@@ -252,9 +252,9 @@ class ObserverScript(SetupScript):
             print >>f, "# timestamp member_id age mae msg_count"
             while True:
                 print >>f, int(time()), mid,
-                print >>f, self._community._message.age, self.predict(), self._community._msg_count, " ".join([str(x) for x in self._community._message.w])
+                print >>f, self._community._model.age, self.predict(), self._community._msg_count, " ".join([str(x) for x in self._community._model.w])
                 f.flush()
-#                print self._community._message.w, self._community._message.age, self._community._x
+#                print self._community._model.w, self._community._model.age, self._community._x
 #                sys.stdout.flush()
                 yield 10.0 # seconds
 
@@ -281,7 +281,7 @@ class ObserverScript(SetupScript):
                     x[int(k)] = float(v)
 
                 # Suppose there are no missing values.
-                x2 = []
+                x2 = [1.0]
                 for k, v in sorted(x.items()):
                     x2.append(v)
 
@@ -300,7 +300,7 @@ class ObserverScript(SetupScript):
                     x[int(k)] = float(v)
 
                 # Suppose there are no missing values.
-                x2 = []
+                x2 = [1.0]
                 for k, v in sorted(x.items()):
                     x2.append(v)
 
@@ -335,14 +335,15 @@ class ObserverScript(SetupScript):
         """
         Predicts on the whole dataset and outputs the results for further analysis.
         """
-        dprint("pred", self._community._message.w)
         mae = 0
         for (x, y) in self._eval_database:
-            ypred = int(self._community.predict(x))
+            ypred = int(self._community._model.predict(x))
             # 0-1 error
             if ypred != y:
                 mae += 1
+#            print y, ypred, y!=ypred
         mae /= 1.0 * len(self._eval_database)
+#        print "#"*10
 
         return mae
 

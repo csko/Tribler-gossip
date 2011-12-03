@@ -3,10 +3,10 @@ from models import GossipLearningModel
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
 
-class LogisticRegressionModel(GossipLearningModel):
+class AdalinePerceptronModel(GossipLearningModel):
 
     def __init__(self):
-        super(LogisticRegressionModel, self).__init__()
+        super(AdalinePerceptronModel, self).__init__()
 
         # Initial model
         self.w = [0, 0, 0, 0, 0]
@@ -18,7 +18,7 @@ class LogisticRegressionModel(GossipLearningModel):
         label = -1.0 if y == 0 else 1.0
 
         self.age = self.age + 1
-        rate = 1.0 / age
+        rate = 1.0 / self.age
         lam = 7
 
         # Perform the Adaline update: w_{i+1} = w_i + eta * (y - w_i' * x) * x.

@@ -12,19 +12,5 @@ class MessagePayload(Payload):
         def message(self):
             return self._message
 
-class GossipMessage:
+class GossipMessage(object):
     pass
-
-class LinearMessage(GossipMessage):
-
-  def __init__(self):
-    self.w = [] # sparse vector
-    self.age = 0
-
-# Example complex type
-class TreeMessage(GossipMessage):
-
-  def __init__(self):
-    self.mu0 = 0
-    self.q = LinearMessage()
-    self.q.w = [15]

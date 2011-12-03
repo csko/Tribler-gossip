@@ -5,6 +5,9 @@ import json
 from Tribler.Core.dispersy.message import DropPacket
 from Tribler.Core.dispersy.conversion import BinaryConversion
 from Tribler.community.gossiplearningframework.payload import *
+# TODO: autoload
+from Tribler.community.gossiplearningframework.models.logisticregression import LogisticRegressionModel
+from Tribler.community.gossiplearningframework.models.adalineperceptron import AdalinePerceptronModel
 
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint

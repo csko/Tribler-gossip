@@ -20,10 +20,10 @@ class LogisticRegressionModel(GossipLearningModel):
 
         self.age = self.age + 1
         lam = 0.0001
-        rate = 1.0 / (age * lam)
+        rate = 1.0 / (self.age * lam)
 
         # Calculate the probability for this instance.
-        prob = self.gx(self.w, x)
+        prob = self.gx(x)
         err = label - prob
 
         # Compute the new w value.
@@ -48,8 +48,8 @@ class LogisticRegressionModel(GossipLearningModel):
 
         # exp() can't handle too high or too low parameters
         if wx > 114:
-            return 0.0
+            return 1e-50
         elif wx < -112:
-            return 1.0
+            return 1.0 - 1e-50
         else:
             return 1.0 / (1.0 + exp(wx))

@@ -1,5 +1,5 @@
 from conversion import Conversion
-from payload import MessagePayload, LinearMessage, GossipMessage
+from payload import MessagePayload, GossipMessage
 from abstractcommunity import AbstractGossipCommunity
 
 from Tribler.Core.dispersy.authentication import MemberAuthentication
@@ -16,6 +16,9 @@ from Tribler.Core.dispersy.message import Message, DelayMessageByProof
 from Tribler.Core.dispersy.resolution import LinearResolution
 from Tribler.Core.dispersy.destination import CommunityDestination
 
+from models.logisticregression import LogisticRegressionModel
+from models.adalineperceptron import AdalinePerceptronModel
+
 # Send messages every 2 seconds.
 DELAY=2.0
 
@@ -25,6 +28,8 @@ INITIALDELAY=15.0
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
 
+# TODO: refactor so that we can use many models
+# TODO: queue support
 class GossipLearningCommunity(AbstractGossipCommunity):
 
     def __init__(self, cid, master_public_key):
@@ -41,14 +46,13 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         self._y = None
 
         # Initial model
-        self._message = LinearMessage()
-        self._message.w = [0, 0, 0, 0]
-        self._message.age = 0
+        self._model = LogisticRegressionModel()
 
     def active_thread(self):
         # "Active thread", send a message and wait delta time.
         while True:
-            self.send_messages([self._message])
+            # TODO: queue
+            self.send_messages([self._model])
             yield DELAY
 
     def check_model(self, messages):
@@ -57,7 +61,6 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         This is a generator function and we can either forward a message or drop it.
         """
         for message in messages:
-            print message
             if isinstance(message.payload.message, GossipMessage):
               age = message.payload.message.age
               if not type(age) == int or age < 0:
@@ -69,47 +72,24 @@ class GossipLearningCommunity(AbstractGossipCommunity):
 
     def on_receive_model(self, messages):
         """
-        One or more models have been received from other peers so we update.
+        One or more models have been received from other peers so we update and store.
         """
         for message in messages:
+            # Stats.
             self._msg_count += 1
-            dprint("Message")
-            dprint(message)
-            dprint(message.payload)
             dprint(("Received message:", message.payload.message))
-            dprint(message.payload.message.w)
-            dprint(self._x)
 
             msg = message.payload.message
 
             assert isinstance(msg, GossipMessage)
 
             # Database not yet loaded.
-            if self._x == None:
+            if self._x == None or self._y == None:
               dprint("Database not yet loaded.")
               continue
 
-            # Set up some variables.
-            x = self._x
-            label = -1.0 if self._y == 0 else 1.0
+            # Update model.
+            msg.update(self._x, self._y)
 
-            age = msg.age + 1
-            w = msg.w
-            rate = 1.0 / age
-            lam = 7
-
-            # Perform the Adaline update: w_{i+1} = w_i + eta * (y - w_i' * x) * x.
-            # Assume the same size (TODO).
-            wx = sum([wi * xi for (wi,xi) in zip(w, x)])
-            dprint(wx)
-            self._message.w = [(1-rate) * w[i] + rate / lam * (label - wx) * x[i] for i in range(len(w))]
-            self._message.age = age
-            dprint(self._message.w)
-
-    def predict(self, x):
-      # Calculate w' * x.
-      w = self._message.w
-      wx = sum([wi * xi for (wi,xi) in zip(w, x)])
-
-      # Return sign(w' * x).
-      return 1 if wx >= 0 else 0
+            # Store model.
+            self._model = msg

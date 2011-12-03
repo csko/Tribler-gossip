@@ -1,7 +1,9 @@
+from Tribler.community.gossiplearningframework.payload import GossipMessage
+
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
 
-class GossipLearningModel:
+class GossipLearningModel(GossipMessage):
 
     def __init__(self):
         pass

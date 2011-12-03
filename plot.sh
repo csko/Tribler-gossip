@@ -21,8 +21,7 @@ set title "$FNAME"
 set ylabel "Average of 0-1 error over the whole network"
 set xlabel "Seconds"
 
-plot "$FNAME" using 1:4 with lines, \
-     "$FNAME" using 1:2 with lines, \
-     "$FNAME" using 1:3 with lines, \
-     0.1
+plot "$FNAME" using 1:3 with lines t 'max', \
+     "$FNAME" using 1:4 with lines t 'avg', \
+     "$FNAME" using 1:2 with lines t 'min'
 gptend

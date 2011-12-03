@@ -1,5 +1,5 @@
 from conversion import Conversion
-from payload import MessagePayload, LinearMessage, GossipMessage
+from payload import MessagePayload, GossipMessage
 
 from Tribler.Core.dispersy.authentication import MemberAuthentication
 from Tribler.Core.dispersy.community import Community
