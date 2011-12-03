@@ -280,7 +280,7 @@ class ObserverScript(SetupScript):
                     k, v = i.split(":")
                     x[int(k)] = float(v)
 
-                # Suppose there are no missing values.
+                # Suppose there are no missing values. Add the bias term.
                 x2 = [1.0]
                 for k, v in sorted(x.items()):
                     x2.append(v)
@@ -299,7 +299,7 @@ class ObserverScript(SetupScript):
                     k, v = i.split(":")
                     x[int(k)] = float(v)
 
-                # Suppose there are no missing values.
+                # Suppose there are no missing values. Add the bias term.
                 x2 = [1.0]
                 for k, v in sorted(x.items()):
                     x2.append(v)

@@ -46,7 +46,8 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         self._y = None
 
         # Initial model
-        self._model = LogisticRegressionModel()
+        self._model = AdalinePerceptronModel()
+        self._model2 = LogisticRegressionModel()
 
     def active_thread(self):
         # "Active thread", send a message and wait delta time.
@@ -74,6 +75,7 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         """
         One or more models have been received from other peers so we update and store.
         """
+        # TODO: Use queue.
         for message in messages:
             # Stats.
             self._msg_count += 1
