@@ -61,9 +61,8 @@ class ClassCoder(json.JSONEncoder):
 
   @classmethod
   def decode_class(cls, d):
-    if isinstance(d, dict) and '__class__' in d:
-      # TODO: check if __class__ is a valid, allowed class name.
- 
+    if isinstance(d, dict) and '__class__' in d and d['__class__'] in ['GossipMessage', 'AdalinePerceptronModel', 'LogisticRegressionModel']:
+
       # Get the class, create object.
       res = globals()[str(d['__class__'])]()
 

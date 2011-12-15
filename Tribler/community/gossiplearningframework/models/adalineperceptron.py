@@ -22,7 +22,7 @@ class AdalinePerceptronModel(GossipLearningModel):
         rate = 1.0 / self.age
         lam = 7
 
-        # Perform the Adaline update: w_{i+1} = w_i + eta * (y - w_i' * x) * x.
+        # Perform the Adaline update: w_{i+1} = (1-eta) * w_i + eta/lam * (y - w_i' * x) * x.
         wx = sum([wi * xi for (wi,xi) in zip(self.w, x)])
         self.w = [(1-rate) * self.w[i] + rate / lam * (label - wx) * x[i] for i in range(len(self.w))]
 
