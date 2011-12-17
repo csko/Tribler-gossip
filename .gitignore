@@ -1,0 +1,8 @@
+*.pyc
+experiment/keys/private_*
+experiment/keys/public_*
+experiment/gossip_ec_master_private_key*
+dispersy.db
+dispersy.db-journal
+states/*
+

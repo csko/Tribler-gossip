@@ -137,6 +137,10 @@ def main():
                 from Tribler.community.walktest.script import ScenarioScript
                 script.add("walktest-scenario", ScenarioScript, include_with_all=False)
 
+#            if not opt.disable_gossiplearningframework_script:
+            from Tribler.community.gossiplearningframework.script import ExperimentScript
+            script.add("gossiplearningframework-observe", ExperimentScript, script_kargs, include_with_all=False)
+
             # if not opt.disable_barter_script:
             #     from Tribler.Community.barter.script import BarterScript, BarterScenarioScript
             #     script.add("barter", BarterScript)
