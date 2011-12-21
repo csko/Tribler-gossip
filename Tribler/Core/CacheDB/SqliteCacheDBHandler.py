@@ -1295,8 +1295,8 @@ class TorrentDBHandler(BasicDBHandler):
         
         values = (torrent_id, swarmname, " ".join(filenames), " ".join(fileextensions))
         #INSERT OR REPLACE not working for fts3 table
-        self._db.execute_write(u"DELETE FROM FullTextIndex WHERE rowid = ?", (torrent_id, ), commit=False)
-        self._db.execute_write(u"INSERT INTO FullTextIndex (rowid, swarmname, filenames, fileextensions) VALUES(?,?,?,?)", values, commit=False)
+#        self._db.execute_write(u"DELETE FROM FullTextIndex WHERE rowid = ?", (torrent_id, ), commit=False)
+#        self._db.execute_write(u"INSERT INTO FullTextIndex (rowid, swarmname, filenames, fileextensions) VALUES(?,?,?,?)", values, commit=False)
         
         # vliegendhart: extract terms and bi-term phrase from Torrent and store it
         nb = NetworkBuzzDBHandler.getInstance()
