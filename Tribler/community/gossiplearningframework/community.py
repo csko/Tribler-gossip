@@ -31,8 +31,6 @@ if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
 
 class GossipLearningCommunity(Community):
-    hardcoded_cid = "0792e0a3741c52fbb25bcfd172b695ad3c67b8f8".decode("HEX")
-
     @classmethod
     def get_master_members(cls):
         master_key = "3081a7301006072a8648ce3d020106052b810400270381920004039a2b5690996f961998e72174a9cf3c28032de6e50c810cde0c87cdc49f1079130f7bcb756ee83ebf31d6d118877c2e0080c0eccfc7ea572225460834298e68d2d7a09824f2f0150718972591d6a6fcda45e9ac854d35af1e882891d690b2b2aa335203a69f09d5ee6884e0e85a1f0f0ae1e08f0cf7fbffd07394a0dac7b51e097cfebf9a463f64eeadbaa0c26c0660".decode("HEX")
@@ -48,22 +46,6 @@ class GossipLearningCommunity(Community):
             return cls.join_community(master, my_member, my_member)
         else:
             return super(GossipLearningCommunity, cls).load_community(master)
-
-#    @classmethod
-#    def join_hardcoded_community(cls, my_member):
-#        # ensure that the community has not already been loaded (as a HardKilledCommunity)
-#        dprint("GOSSIPjoin")
-#        quit()
-#        if not Dispersy.get_instance().has_community(cls.hardcoded_cid):
-#            return cls.join_community(Member.get_instance(cls.hardcoded_master_public_key), my_member)
-
-#    @classmethod
-#    def load_hardcoded_community(cls):
-#        dprint("GOSSIPload")
-#        quit()
-#        # ensure that the community has not already been loaded (as a HardKilledCommunity)
-#        if not Dispersy.get_instance().has_community(cls.hardcoded_cid):
-#            return cls.load_community(Member.get_instance(cls.hardcoded_master_public_key))
 
     def __init__(self, master):
         dprint("GOSSIPinit")
