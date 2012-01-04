@@ -34,6 +34,7 @@ from Tribler.Core.dispersy.dispersy import Dispersy
 from Tribler.community.allchannel.community import AllChannelCommunity
 from Tribler.community.channel.community import ChannelCommunity
 from Tribler.community.channel.preview import PreviewChannelCommunity
+from Tribler.community.gossiplearningframework.community import GossipLearningCommunity
 from Tribler.Core.Utilities.utilities import get_collected_torrent_filename
 
 if sys.platform == 'win32':
@@ -388,6 +389,7 @@ class TriblerLaunchMany(Thread):
             schedule = []
             schedule.append((AllChannelCommunity, (self.session.dispersy_member,), {"auto_join_channel":True} if sys.argv[0].endswith("dispersy-channel-booster.py") else {}))
             schedule.append((ChannelCommunity, (), {}))
+            schedule.append((GossipLearningCommunity, (self.session.dispersy_member,), {}))
 
             for cls, args, kargs in schedule:
                 counter = -1
@@ -428,6 +430,7 @@ class TriblerLaunchMany(Thread):
 
         # define auto loads
         self.dispersy.define_auto_load(AllChannelCommunity, (self.session.dispersy_member,), {"auto_join_channel":True} if sys.argv[0].endswith("dispersy-channel-booster.py") else {})
+        self.dispersy.define_auto_load(GossipLearningCommunity, (self.session.dispersy_member,), {})
         self.dispersy.define_auto_load(ChannelCommunity)
         self.dispersy.define_auto_load(PreviewChannelCommunity)
 

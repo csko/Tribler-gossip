@@ -1,6 +1,22 @@
-from payload import MessagePayload, GossipMessage
-from abstractcommunity import AbstractGossipCommunity
+from Tribler.Core.dispersy.authentication import MemberAuthentication
+from Tribler.Core.dispersy.community import Community
+from Tribler.Core.dispersy.conversion import DefaultConversion
+from Tribler.Core.dispersy.message import DropMessage
+from Tribler.Core.dispersy.distribution import DirectDistribution
+from Tribler.Core.dispersy.member import Member
+from Tribler.Core.dispersy.resolution import PublicResolution
 
+from Tribler.Core.dispersy.destination import SubjectiveDestination
+from Tribler.Core.dispersy.dispersy import Dispersy
+from Tribler.Core.dispersy.dispersydatabase import DispersyDatabase
+from Tribler.Core.dispersy.distribution import FullSyncDistribution, LastSyncDistribution
+from Tribler.Core.dispersy.message import Message, DelayMessageByProof
+from Tribler.Core.dispersy.resolution import LinearResolution
+from Tribler.Core.dispersy.destination import CommunityDestination
+
+from conversion import JSONConversion
+
+from payload import MessagePayload, GossipMessage
 from models.logisticregression import LogisticRegressionModel
 from models.adalineperceptron import AdalinePerceptronModel
 
@@ -8,23 +24,59 @@ from models.adalineperceptron import AdalinePerceptronModel
 DELAY=2.0
 
 # Start after 15 seconds.
-#INITIALDELAY=15.0
+INITIALDELAY=15.0
+
 
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
 
-# TODO: refactor so that we can use many models
-# TODO: queue support
-class GossipLearningCommunity(AbstractGossipCommunity):
+class GossipLearningCommunity(Community):
+    hardcoded_cid = "0792e0a3741c52fbb25bcfd172b695ad3c67b8f8".decode("HEX")
+
+    @classmethod
+    def get_master_members(cls):
+        master_key = "3081a7301006072a8648ce3d020106052b810400270381920004039a2b5690996f961998e72174a9cf3c28032de6e50c810cde0c87cdc49f1079130f7bcb756ee83ebf31d6d118877c2e0080c0eccfc7ea572225460834298e68d2d7a09824f2f0150718972591d6a6fcda45e9ac854d35af1e882891d690b2b2aa335203a69f09d5ee6884e0e85a1f0f0ae1e08f0cf7fbffd07394a0dac7b51e097cfebf9a463f64eeadbaa0c26c0660".decode("HEX")
+        master = Member.get_instance(master_key)
+        return [master]
+
+    @classmethod
+    def load_community(cls, master, my_member):
+        dispersy_database = DispersyDatabase.get_instance()
+        try:
+            dispersy_database.execute(u"SELECT 1 FROM community WHERE master = ?", (master.database_id,)).next()
+        except StopIteration:
+            return cls.join_community(master, my_member, my_member)
+        else:
+            return super(GossipLearningCommunity, cls).load_community(master)
+
+#    @classmethod
+#    def join_hardcoded_community(cls, my_member):
+#        # ensure that the community has not already been loaded (as a HardKilledCommunity)
+#        dprint("GOSSIPjoin")
+#        quit()
+#        if not Dispersy.get_instance().has_community(cls.hardcoded_cid):
+#            return cls.join_community(Member.get_instance(cls.hardcoded_master_public_key), my_member)
+
+#    @classmethod
+#    def load_hardcoded_community(cls):
+#        dprint("GOSSIPload")
+#        quit()
+#        # ensure that the community has not already been loaded (as a HardKilledCommunity)
+#        if not Dispersy.get_instance().has_community(cls.hardcoded_cid):
+#            return cls.load_community(Member.get_instance(cls.hardcoded_master_public_key))
 
     def __init__(self, master):
+        dprint("GOSSIPinit")
         super(GossipLearningCommunity, self).__init__(master)
-        if __debug__: dprint('gossiplearningcommunity' + self._cid.encode("HEX"))
+        if __debug__: dprint('gossiplearningcommunity ' + self._cid.encode("HEX"))
+
+        # Periodically we will send our data to other node(s).
+        self._dispersy.callback.register(self.active_thread, delay=INITIALDELAY)
 
         # Stats
         self._msg_count = 0
 
-        # They should be loaded from a database.
+        # These should be loaded from a database.
 
         # x and y are stored only locally
         self._x = None
@@ -33,6 +85,38 @@ class GossipLearningCommunity(AbstractGossipCommunity):
         # Initial model
         self._model = AdalinePerceptronModel()
         self._model2 = LogisticRegressionModel()
+
+
+    def initiate_meta_messages(self):
+        """Define the messages we will be using."""
+        return [Message(self, u"modeldata",
+                MemberAuthentication(encoding="sha1"), # Only signed with the owner's SHA1 digest
+                PublicResolution(),
+                DirectDistribution(),
+#                FullSyncDistribution(), # Full gossip
+                CommunityDestination(node_count=1), # Reach only one node each time.
+                MessagePayload(),
+                self.check_model,
+                self.on_receive_model)]
+
+    def initiate_conversions(self):
+        return [DefaultConversion(self),
+                JSONConversion(self)]
+
+    def send_messages(self, messages):
+        meta = self.get_meta_message(u"modeldata")
+
+        send_messages = []
+
+        for message in messages:
+          assert isinstance(message, GossipMessage)
+
+          # Create and implement message with 3 parameters
+          send_messages.append(meta.impl(authentication=(self._my_member,),
+                                   distribution=(self.global_time,),
+                                   payload=(message,)))
+          self._dispersy.store_update_forward(send_messages, store = False, update = False, forward = True)
+#          self._dispersy.store_update_forward(send_messages, store = True, update = True, forward = True) # For testing
 
     def active_thread(self):
         # "Active thread", send a message and wait delta time.
