@@ -1006,8 +1006,7 @@ def return_feasible_playback_modes(syspath):
             import Tribler.vlc as vlc
         
         # Niels: check version of vlc
-#        version = vlc.libvlc_get_version()
-        version = "1.1.0"
+        version = vlc.libvlc_get_version()
         subversions = version.split(".")
         if len(subversions) > 2:
             version = subversions[0]+"."+subversions[1]
