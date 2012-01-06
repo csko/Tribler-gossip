@@ -16,9 +16,9 @@ class JSONConversion(BinaryConversion):
     def __init__(self, community):
         super(JSONConversion, self).__init__(community, "\x01") # Community version 1
         # Message type ID 1
-        self.define_meta_message(chr(1), community.get_meta_message(u"modeldata"), self._encode_text, self._decode_text)
+        self.define_meta_message(chr(1), community.get_meta_message(u"modeldata"), self._encode_json, self._decode_json)
 
-    def _encode_text(self, message):
+    def _encode_json(self, message):
         dprint(type(message.payload.message))
         dprint(message.payload.message)
         assert isinstance(message.payload.message, GossipMessage)
@@ -31,7 +31,7 @@ class JSONConversion(BinaryConversion):
         # Encode the length on 2 bytes, network byte order. The wire data follows.
         return pack("!H", len(wiredata)), wiredata
 
-    def _decode_text(self, meta_message, offset, data):
+    def _decode_json(self, meta_message, offset, data):
         if len(data) < offset + 2:
             raise DropPacket("Insufficient packet size")
 
@@ -45,7 +45,7 @@ class JSONConversion(BinaryConversion):
         except UnicodeError:
             raise DropPacket("Unable to decode UTF-8")
 
-        return offset, meta_message.payload.implement(wiredata)
+        return offset, meta_message.meta.payload.implement(wiredata)
 
 class ClassCoder(json.JSONEncoder):
   def default(self, obj):
