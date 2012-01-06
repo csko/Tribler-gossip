@@ -97,6 +97,7 @@ class GossipLearningCommunity(Community):
           send_messages.append(meta.impl(authentication=(self._my_member,),
                                    distribution=(self.global_time,),
                                    payload=(message,)))
+          dprint("GOSSIP: calling self._dispersy.store_update_forward(%s, store = False, update = False, forward = True)." % send_messages)
           self._dispersy.store_update_forward(send_messages, store = False, update = False, forward = True)
 #          self._dispersy.store_update_forward(send_messages, store = True, update = True, forward = True) # For testing
 
