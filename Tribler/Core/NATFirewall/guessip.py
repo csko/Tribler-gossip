@@ -121,6 +121,10 @@ def get_my_wan_ip_linux():
                 if len(words2) == 2 and words2[1] != '127.0.0.1':
                     mywanip = words2[1]
                     break
+                elif len(words2) == 1 and words2[0] != '127.0.0.1' \
+                 and len(words2[0].split('.')) == 4: # this should ideally be a more complex check
+                        mywanip = words2[0]
+                        break
                 else:
                     flag = False
             else:
