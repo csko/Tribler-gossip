@@ -39,13 +39,33 @@ class SetupScript(ScriptBase):
 
         self.caller(self.setup)
 
+    def join_community(self):
+
+        master_key = "3081a7301006072a8648ce3d020106052b810400270381920004039a2b5690996f961998e72174a9cf3c28032de6e50c810cde0c87cdc49f1079130f7bcb756ee83ebf31d6d118877c2e0080c0eccfc7ea572225460834298e68d2d7a09824f2f0150718972591d6a6fcda45e9ac854d35af1e882891d690b2b2aa335203a69f09d5ee6884e0e85a1f0f0ae1e08f0cf7fbffd07394a0dac7b51e097cfebf9a463f64eeadbaa0c26c0660".decode("HEX")
+        master = Member.get_instance(master_key)
+
+        assert self._my_member.public_key
+        assert self._my_member.private_key
+        assert master.public_key
+        assert not master.private_key
+
+        dprint("-master- ", master.database_id, " ", id(master), " ", master.mid.encode("HEX"), force=1)
+        dprint("-my member- ", self._my_member.database_id, " ", id(self._my_member), " ", self._my_member.mid.encode("HEX"), force=1)
+
+        return GossipLearningCommunity.join_community(master, self._my_member, self._my_member)
+
     def setup(self):
         """
         Set up the community.
         """
 
-        self._community = GossipLearningCommunity.create_community(self._my_member)
+        # join the community with the newly created member
+        self._community = self.join_community()
+        dprint("Joined community ", self._community._my_member)
+
+#        self._community = GossipLearningCommunity.create_community(self._my_member)
         address = self._dispersy.socket.get_address()
+        dprint("Address: ", address)
 
         # cleanup, TODO
         # community.create_dispersy_destroy_community(u"hard-kill")
@@ -66,7 +86,7 @@ class ExperimentScript(SetupScript):
 
     def print_status(self):
         """
-        This will print the status of the model every 10 seconds.
+        Print the status of the model every 10 seconds.
         """
         member_name = self._kargs["hardcoded_member"]
         mid = int(member_name[1:]) - 1
