@@ -80,7 +80,7 @@ class ExperimentScript(SetupScript):
         super(ExperimentScript, self).run()
         self._train_database = []
         self._eval_database = []
-        self.load_database("iris_setosa_versicolor")
+        self.load_database(self._kargs["database"])
         self.caller(self.pick_instances)
         self.caller(self.print_status)
 
@@ -91,7 +91,7 @@ class ExperimentScript(SetupScript):
         member_name = self._kargs["hardcoded_member"]
         mid = int(member_name[1:]) - 1
 
-        logfile = "experiment/logs/%05d_setosa_versicolor.log" % mid
+        logfile = "experiment/logs/%05d_%s.log" % (mid, self._kargs["database"])
         with open(logfile, "w") as f:
             print >>f, "# timestamp member_id age mae msg_count"
             while True:
