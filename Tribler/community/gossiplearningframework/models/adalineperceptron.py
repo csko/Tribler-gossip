@@ -34,3 +34,8 @@ class AdalinePerceptronModel(GossipLearningModel):
 
       # Return sign(w' * x).
       return 1 if wx >= 0 else 0
+
+    def merge(self, model):
+        self.age = max(self.age, model.age)
+        self.w = [(self.w[i] + model.w[i]) / 2.0 for i in range(len(self.w))]
+

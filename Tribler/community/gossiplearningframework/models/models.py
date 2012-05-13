@@ -11,5 +11,8 @@ class GossipLearningModel(GossipMessage):
     def update(self):
         raise NotImplementedError('update')
 
-    def update(self):
+    def predict(self):
+        raise NotImplementedError('predict')
+
+    def merge(self):
         raise NotImplementedError('predict')

@@ -38,3 +38,7 @@ class P2PegasosModel(GossipLearningModel):
         inner_product = sum([self.w[i] * x[i] for i in range(len(self.w))])
         return 1.0 if inner_product > 0.0 else 0.0
 
+    def merge(self, model):
+        self.age = max(self.age, model.age)
+        self.w = [(self.w[i] + model.w[i]) / 2.0 for i in range(len(self.w))]
+

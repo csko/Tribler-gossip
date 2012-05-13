@@ -53,3 +53,8 @@ class LogisticRegressionModel(GossipLearningModel):
             return 1.0 - 1e-50
         else:
             return 1.0 / (1.0 + exp(wx))
+
+    def merge(self, model):
+        self.age = (self.age + model.age) >> 1
+        self.w = [(self.w[i] + model.w[i]) / 2.0 for i in range(len(self.w))]
+
