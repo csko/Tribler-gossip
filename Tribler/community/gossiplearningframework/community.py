@@ -98,7 +98,7 @@ class GossipLearningCommunity(Community):
           send_messages.append(meta.impl(authentication=(self._my_member,),
                                    distribution=(self.global_time,),
                                    payload=(message,)))
-          # dprint("GOSSIP: calling self._dispersy.store_update_forward(%s, store = False, update = False, forward = True)." % send_messages)
+          # if __debug__: dprint("GOSSIP: calling self._dispersy.store_update_forward(%s, store = False, update = False, forward = True)." % send_messages)
           self._dispersy.store_update_forward(send_messages, store = False, update = False, forward = True)
 #          self._dispersy.store_update_forward(send_messages, store = True, update = True, forward = True) # For testing
 
@@ -132,7 +132,7 @@ class GossipLearningCommunity(Community):
         for message in messages:
             # Stats.
             self._msg_count += 1
-            dprint(("Received message:", message.payload.message))
+            if __debug__: dprint(("Received message:", message.payload.message))
 
             msg = message.payload.message
 
@@ -140,13 +140,29 @@ class GossipLearningCommunity(Community):
 
             # Database not yet loaded.
             if self._x == None or self._y == None:
-                dprint("Database not yet loaded.")
+                if __debug__: dprint("Database not yet loaded.")
                 continue
 
-            # Update model on all local training examples.
-            for x, y in zip(self._x, self._y):
-                msg.update(x, y)
+            # Create and store new model using one strategy.
+            self._model = self.create_model_mu(msg, self._model)
 
-            # Store model.
-            self._model = msg
+    def create_model_rw(self, m1, m2):
+        self.update(m1)
+        return m1
+
+    def create_model_mu(self, m1, m2):
+        m1.merge(m2)
+        self.update(m1)
+        return m1
+
+    def create_model_um(self, m1, m2):
+        self.update(m1)
+        self.update(m2)
+        m1.merge(m2)
+        return m1
+
+    def update(self, model):
+        """Update a model using all local training examples."""
+        for x, y in zip(self._x, self._y):
+            model.update(x, y)
 
