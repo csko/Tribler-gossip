@@ -16,6 +16,8 @@ from Tribler.Core.dispersy.destination import CommunityDestination
 
 from conversion import JSONConversion
 
+from collections import deque
+
 from payload import MessagePayload, GossipMessage
 from models.logisticregression import LogisticRegressionModel
 from models.adalineperceptron import AdalinePerceptronModel
@@ -27,6 +29,8 @@ DELAY=2.0
 # Start after 15 seconds.
 INITIALDELAY=15.0
 
+# Model queue size.
+MODEL_QUEUE_SIZE=10
 
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
@@ -64,11 +68,14 @@ class GossipLearningCommunity(Community):
         self._x = None
         self._y = None
 
-        # Initial model
-        #self._model = AdalinePerceptronModel()
-        #self._model = LogisticRegressionModel()
-        self._model = P2PegasosModel()
+        self._model_queue = deque(maxlen=MODEL_QUEUE_SIZE)
 
+        # Initial model
+        # initmodel = AdalinePerceptronModel()
+        # initmodel = LogisticRegressionModel()
+        initmodel = P2PegasosModel()
+
+        self._model_queue.append(initmodel)
 
     def initiate_meta_messages(self):
         """Define the messages we will be using."""
@@ -103,10 +110,12 @@ class GossipLearningCommunity(Community):
 #          self._dispersy.store_update_forward(send_messages, store = True, update = True, forward = True) # For testing
 
     def active_thread(self):
-        # "Active thread", send a message and wait delta time.
+        """
+        Active thread, send a message and wait delta time.
+        """
         while True:
-            # TODO: queue
-            self.send_messages([self._model])
+            # Send the last model in the queue.
+            self.send_messages([self._model_queue[-1]])
             yield DELAY
 
     def check_model(self, messages):
@@ -128,7 +137,6 @@ class GossipLearningCommunity(Community):
         """
         One or more models have been received from other peers so we update and store.
         """
-        # TODO: Use queue.
         for message in messages:
             # Stats.
             self._msg_count += 1
@@ -144,7 +152,12 @@ class GossipLearningCommunity(Community):
                 continue
 
             # Create and store new model using one strategy.
-            self._model = self.create_model_mu(msg, self._model)
+            self._model_queue.append(self.create_model_mu(msg, self._model_queue[-1]))
+
+    def update(self, model):
+        """Update a model using all local training examples."""
+        for x, y in zip(self._x, self._y):
+            model.update(x, y)
 
     def create_model_rw(self, m1, m2):
         self.update(m1)
@@ -161,8 +174,4 @@ class GossipLearningCommunity(Community):
         m1.merge(m2)
         return m1
 
-    def update(self, model):
-        """Update a model using all local training examples."""
-        for x, y in zip(self._x, self._y):
-            model.update(x, y)
 

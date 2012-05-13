@@ -96,9 +96,10 @@ class ExperimentScript(SetupScript):
             print >>f, "# timestamp member_id age mae msg_count"
             while True:
                 print >>f, int(time()), mid,
-                print >>f, self._community._model.age, self.predict(), self._community._msg_count, " ".join([str(x) for x in self._community._model.w])
+                print >>f, self._community._model_queue[-1].age, self.predict(), self._community._msg_count, \
+                        " ".join([str(x) for x in self._community._model_queue[-1].w])
                 f.flush()
-#                print self._community._model.w, self._community._model.age, self._community._x
+#                print self._community._model.w, self._community._model_queue[-1].age, self._community._x
 #                sys.stdout.flush()
                 yield 10.0 # seconds
 
@@ -181,7 +182,7 @@ class ExperimentScript(SetupScript):
         """
         mae = 0
         for (x, y) in self._eval_database:
-            ypred = int(self._community._model.predict(x))
+            ypred = int(self._community._model_queue[-1].predict(x))
             # 0-1 error
             if ypred != y:
                 mae += 1
