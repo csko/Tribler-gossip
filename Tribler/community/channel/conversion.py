@@ -13,16 +13,27 @@ DEBUG = False
 class ChannelConversion(BinaryConversion):
     def __init__(self, community):
         super(ChannelConversion, self).__init__(community, "\x01")
-        self.define_meta_message(chr(1), community.get_meta_message(u"channel"), self._encode_channel, self._decode_channel)
-        self.define_meta_message(chr(2), community.get_meta_message(u"torrent"), self._encode_torrent, self._decode_torrent)
-        self.define_meta_message(chr(3), community.get_meta_message(u"playlist"), self._encode_playlist, self._decode_playlist)
-        self.define_meta_message(chr(4), community.get_meta_message(u"comment"), self._encode_comment, self._decode_comment)
-        self.define_meta_message(chr(5), community.get_meta_message(u"modification"), self._encode_modification, self._decode_modification)
-        self.define_meta_message(chr(6), community.get_meta_message(u"playlist_torrent"), self._encode_playlist_torrent, self._decode_playlist_torrent)
-        self.define_meta_message(chr(7), community.get_meta_message(u"missing-channel"), self._encode_missing_channel, self._decode_missing_channel)
-        self.define_meta_message(chr(8), community.get_meta_message(u"moderation"), self._encode_moderation, self._decode_moderation)
-        self.define_meta_message(chr(9), community.get_meta_message(u"mark_torrent"), self._encode_mark_torrent, self._decode_mark_torrent)
-
+        self.define_meta_message(chr(1), community.get_meta_message(u"channel"), lambda message: self._encode_decode(self._encode_channel, self._decode_channel, message), self._decode_channel)
+        self.define_meta_message(chr(2), community.get_meta_message(u"torrent"), lambda message: self._encode_decode(self._encode_torrent, self._decode_torrent, message), self._decode_torrent)
+        self.define_meta_message(chr(3), community.get_meta_message(u"playlist"), lambda message: self._encode_decode(self._encode_playlist, self._decode_playlist, message), self._decode_playlist)
+        self.define_meta_message(chr(4), community.get_meta_message(u"comment"), lambda message: self._encode_decode(self._encode_comment, self._decode_comment, message), self._decode_comment)
+        self.define_meta_message(chr(5), community.get_meta_message(u"modification"), lambda message: self._encode_decode(self._encode_modification, self._decode_modification, message), self._decode_modification)
+        self.define_meta_message(chr(6), community.get_meta_message(u"playlist_torrent"), lambda message: self._encode_decode(self._encode_playlist_torrent, self._decode_playlist_torrent, message), self._decode_playlist_torrent)
+        self.define_meta_message(chr(7), community.get_meta_message(u"missing-channel"), lambda message: self._encode_decode(self._encode_missing_channel, self._decode_missing_channel, message), self._decode_missing_channel)
+        self.define_meta_message(chr(8), community.get_meta_message(u"moderation"), lambda message: self._encode_decode(self._encode_moderation, self._encode_moderation, message), self._decode_moderation)
+        self.define_meta_message(chr(9), community.get_meta_message(u"mark_torrent"), lambda message: self._encode_decode(self._encode_mark_torrent, self._decode_mark_torrent, message), self._decode_mark_torrent)
+        
+    def _encode_decode(self, encode, decode, message):
+        result = encode(message)
+        try:
+            decode(None, 0, result[0])
+            
+        except DropPacket:
+            raise
+        except:
+            pass
+        return result
+    
     def _encode_channel(self, message):
         return encode((message.payload.name, message.payload.description)),
 
@@ -306,6 +317,8 @@ class ChannelConversion(BinaryConversion):
         if not "modification-type" in dic:
             raise DropPacket("Missing 'modification-type'")
         modification_type = dic["modification-type"]
+        if not isinstance(modification_type, unicode):
+            raise DropPacket("Invalid 'modification_type' type") 
         
         if not "modification-value" in dic:
             raise DropPacket("Missing 'modification-value'")
@@ -331,8 +344,12 @@ class ChannelConversion(BinaryConversion):
         if not isinstance(modification_on_global_time, (int, long)):
             raise DropPacket("Invalid 'modification-on-global-time' type")
         
-        packet_id, packet, message_name = self._get_message(modification_on_global_time, modification_on_mid)
-        modification_on = Packet(self._community.get_meta_message(message_name), packet, packet_id)
+        try:
+            packet_id, packet, message_name = self._get_message(modification_on_global_time, modification_on_mid)
+            modification_on = Packet(self._community.get_meta_message(message_name), packet, packet_id)
+        except DropPacket:
+            member = Member.get_instance(modification_on_mid, public_key_available=False)
+            raise DelayPacketByMissingMessage(self._community, member, [modification_on_global_time])
         
         prev_modification_mid = dic.get("prev-modification-mid", None)
         if prev_modification_mid and not (isinstance(prev_modification_mid, str) and len(prev_modification_mid) == 20):
@@ -383,7 +400,7 @@ class ChannelConversion(BinaryConversion):
                     WHERE sync.community = ? AND sync.global_time = ? AND member.mid = ?""",
                                                           (self._community.database_id, global_time, buffer(mid))).next()
             except StopIteration:
-                raise DropPacket("Missing previous message")
+                raise DropPacket("Missing message")
             
             return packet_id, str(packet), message_name
 

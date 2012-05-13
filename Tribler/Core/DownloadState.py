@@ -342,9 +342,9 @@ class DownloadState(Serializable):
     def get_length(self):
         tdef = self.download.get_def()
         if len(self.download.get_selected_files()) > 0:
-            files = self.download.get_selected_files() 
+            files = self.download.get_selected_files()
         else:
-            files = tdef.get_files()
+            files = None
         return tdef.get_length(files)
         
     def get_availability(self):
@@ -471,6 +471,7 @@ class DownloadState(Serializable):
         'uinterested' = Upload Interested: True/False
         'uchoked' = Upload Choked: True/False
         'uhasqueries' = Upload has requests in buffer and not choked
+        'uflushed' = Upload is not flushed
         'downrate' = Download rate in KB/s
         'dinterested' = Download interested: True/Flase
         'dchoked' = Download choked: True/False

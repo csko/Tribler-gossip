@@ -152,7 +152,7 @@ class Session(SessionRuntimeConfig):
         
         # 3. tracker
         trackerdir = self.get_internal_tracker_dir()
-        if not os.path.isdir(trackerdir):
+        if not os.path.exists(trackerdir):
             os.mkdir(trackerdir)
 
         if self.sessconfig['tracker_dfile'] is None:
@@ -317,7 +317,23 @@ class Session(SessionRuntimeConfig):
         """
         # locking by lm
         self.lm.remove(d,removecontent=removecontent,removestate=removestate)
-
+        
+    def remove_download_by_infohash(self, infohash, removecontent=False, removestate=True):
+        """
+        @param infohash The Download to remove
+        @param removecontent Whether to delete the already downloaded content
+        from disk.
+        
+        !We can only remove content when the download object is found, otherwise only
+        the state is removed.
+        """
+        downloadList = self.get_downloads()
+        for download in downloadList:
+            if download.get_def().get_infohash() == infohash:
+                self.remove_download(download,removecontent,removestate)
+                return
+        
+        self.uch.perform_removestate_callback(infohash, [], False)
 
     def set_download_states_callback(self,usercallback,getpeerlist=False):
         """
@@ -846,7 +862,7 @@ class Session(SessionRuntimeConfig):
                     self.lm.rawserver_nonfatalerrorfunc(e)
 
             # Checkpoint all Downloads and stop NetworkThread
-            if DEBUG:
+            if DEBUG or stop:
                 print >>sys.stderr,"Session: checkpoint_shutdown"
             self.lm.checkpoint(stop=stop,checkpoint=checkpoint,gracetime=gracetime)
         finally:

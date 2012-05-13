@@ -46,7 +46,7 @@ class Switch(Yielder):
 
     def handle(self, cself, requests, expired, actual_time, deadline, priority, root_id, call, callback):
         with self._cother._lock:
-            if not isinstance(root_id, str):
+            if not isinstance(root_id, basestring):
                 self._cother._id += 1
                 root_id = self._cother._id
             self._cother._new_actions.append(("register", (deadline, priority, root_id, call, callback)))
@@ -215,9 +215,9 @@ class Callback(object):
         be undefined for calls with the same PRIORITY.
 
         Each call is identified with an ID_.  A unique numerical identifier will be assigned when no
-        ID_ is specified.  And specified id's must be strings.  Registering multiple calls with the
-        same ID_ is allowed, all calls will be handled normally, however, all these calls will be
-        removed if the associated ID_ is unregistered.
+        ID_ is specified.  And specified id's must be (unicode)strings.  Registering multiple calls
+        with the same ID_ is allowed, all calls will be handled normally, however, all these calls
+        will be removed if the associated ID_ is unregistered.
 
         Once the call is performed the optional CALLBACK is registered to be called immediately.
         The first parameter of the CALLBACK will always be either the returned value or the raised
@@ -244,7 +244,7 @@ class Callback(object):
         assert kargs is None or isinstance(kargs, dict), "KARGS has invalid type: %s" % type(kargs)
         assert isinstance(delay, float), "DELAY has invalid type: %s" % type(delay)
         assert isinstance(priority, int), "PRIORITY has invalid type: %s" % type(priority)
-        assert isinstance(id_, str), "ID_ has invalid type: %s" % type(id_)
+        assert isinstance(id_, basestring), "ID_ has invalid type: %s" % type(id_)
         assert callback is None or callable(callback), "CALLBACK must be None or callable"
         assert isinstance(callback_args, tuple), "CALLBACK_ARGS has invalid type: %s" % type(callback_args)
         assert callback_kargs is None or isinstance(callback_kargs, dict), "CALLBACK_KARGS has invalid type: %s" % type(callback_kargs)
@@ -278,8 +278,8 @@ class Callback(object):
          > callback.persistent_register("my-id", my_func, ("second",))
          > -> my_func("first") will be called after 60 seconds, my_func("second") will not be called at all
         """
-        assert isinstance(id_, str), "ID_ has invalid type: %s" % type(id_)
-        assert id_, "ID_ may not be an empty string"
+        assert isinstance(id_, basestring), "ID_ has invalid type: %s" % type(id_)
+        assert id_, "ID_ may not be an empty (unicode)string"
         assert hasattr(call, "__call__"), "CALL must be callable"
         assert isinstance(args, tuple), "ARGS has invalid type: %s" % type(args)
         assert kargs is None or isinstance(kargs, dict), "KARGS has invalid type: %s" % type(kargs)
@@ -306,8 +306,8 @@ class Callback(object):
         This is a faster way to handle an unregister and register call.  All parameters behave as in
         register(...).
         """
-        assert isinstance(id_, (str, int)), "ID_ has invalid type: %s" % type(id_)
-        assert id_, "ID_ may not be zero or an empty string"
+        assert isinstance(id_, (basestring, int)), "ID_ has invalid type: %s" % type(id_)
+        assert id_, "ID_ may not be zero or an empty (unicode)string"
         assert hasattr(call, "__call__"), "CALL must be callable"
         assert isinstance(args, tuple), "ARGS has invalid type: %s" % type(args)
         assert kargs is None or isinstance(kargs, dict), "KARGS has invalid type: %s" % type(kargs)
@@ -332,8 +332,8 @@ class Callback(object):
         """
         Unregister a callback using the ID_ obtained from the register(...) method
         """
-        assert isinstance(id_, (str, int)), "ROOT_ID has invalid type: %s" % type(id_)
-        assert id_, "ID_ may not be zero or an empty string"
+        assert isinstance(id_, (basestring, int)), "ROOT_ID has invalid type: %s" % type(id_)
+        assert id_, "ID_ may not be zero or an empty (unicode)string"
         if __debug__: dprint(id_)
         with self._lock:
             self._new_actions.append(("unregister", id_))
@@ -493,7 +493,8 @@ class Callback(object):
                 if actual_time - deadline >= MAX_DESYNC_TIME:
                     if __debug__:
                         # sort and group by call[0].__name__
-                        debug_key = lambda debug_tup: debug_tup[3][0].__name__
+                        # 10/02/12 Boudewijn: in python 2.5 generators do not have .__name__
+                        debug_key = lambda debug_tup: debug_tup[3][0].__name__ if hasattr(debug_tup[3][0], "__name__") else str(debug_tup[3][0])
                         for debug_call_name, debug_iterator in groupby(sorted(expired, key=debug_key), key=debug_key):
                             debug_list = list(debug_iterator)
                             dprint("%3dx expired " % len(debug_list), debug_call_name, level="warning")
@@ -503,7 +504,8 @@ class Callback(object):
 
                 while True:
                     if __debug__:
-                        debug_call_name = call[0].__name__
+                        # 10/02/12 Boudewijn: in python 2.5 generators do not have .__name__
+                        debug_call_name = call[0].__name__ if hasattr(call[0], "__name__") else str(call[0])
                         debug_call_start = time()
 
                     # call can be either:

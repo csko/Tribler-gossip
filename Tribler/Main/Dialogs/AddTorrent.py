@@ -40,7 +40,7 @@ class AddTorrent(wx.Dialog):
         hSizer.Add(browseButton, 0, wx.RIGHT, 3)
         hSizer.Add(browseDirectory)
         vSizer.Add(hSizer, 0, wx.ALIGN_RIGHT|wx.BOTTOM, 3)
-        vSizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.LEFT|wx.RIGHT|wx.BOTTOM, 10)
+        vSizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.BOTTOM, 10)
         
         header = wx.StaticText(self, -1, 'Url')
         _set_font(header, fontweight=wx.FONTWEIGHT_BOLD)
@@ -55,7 +55,7 @@ class AddTorrent(wx.Dialog):
         hSizer.Add(linkButton, 0, wx.LEFT, 3)
         vSizer.Add(hSizer, 0 , wx.EXPAND|wx.BOTTOM, 3)
         
-        vSizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.LEFT|wx.RIGHT|wx.BOTTOM, 10)
+        vSizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.BOTTOM, 10)
         if libraryTorrents != None:
             if len(libraryTorrents) > 0:
                 header = wx.StaticText(self, -1, 'Choose one from you library')
@@ -75,7 +75,7 @@ class AddTorrent(wx.Dialog):
                 hSizer.Add(linkButton, 0, wx.LEFT, 3)
                 vSizer.Add(hSizer, 0 , wx.EXPAND|wx.BOTTOM, 3)
             
-            vSizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.LEFT|wx.RIGHT|wx.BOTTOM, 10)
+            vSizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.BOTTOM, 10)
             header = wx.StaticText(self, -1, 'Create your own .torrents')
             _set_font(header, fontweight=wx.FONTWEIGHT_BOLD)
             vSizer.Add(header, 0, wx.EXPAND|wx.BOTTOM|wx.TOP, 3)
@@ -194,13 +194,14 @@ class AddTorrent(wx.Dialog):
     
     def OnCreate(self, event):
         configfile = os.path.join(self.guiutility.utility.session.get_state_dir(), 'recent_trackers')
+        configfile2 = os.path.join(self.guiutility.utility.session.get_state_dir(), 'recent_created')
         trackers = self.guiutility.channelsearch_manager.torrent_db.getPopularTrackers()
         
-        dlg = CreateTorrent(self, configfile, trackers, self.toChannel)
+        dlg = CreateTorrent(self, configfile, configfile2, trackers, self.toChannel)
         if dlg.ShowModal() == wx.ID_OK:
-            for destdir, torrentfilename in dlg.createdTorrents:
+            for destdir, correctedfilename, torrentfilename in dlg.createdTorrents:
                 #Niels: important do not pass fixtorrent to startDownload, used to differentiate between created and imported torrents
-                self.frame.startDownload(torrentfilename = torrentfilename, destdir = destdir)
+                self.frame.startDownload(torrentfilename = torrentfilename, destdir = destdir, correctedFilename = correctedfilename)
             
             dlg.Destroy()
             self.EndModal(wx.ID_OK)
@@ -208,7 +209,7 @@ class AddTorrent(wx.Dialog):
         dlg.Destroy()
     
     def _GetDestPath(self):
-        dlg = SaveAs(self, None, self.defaultDLConfig.get_dest_dir(), os.path.join(self.frame.utility.session.get_state_dir(), 'recent_download_history'))
+        dlg = SaveAs(self, None, self.defaultDLConfig.get_dest_dir(), None, os.path.join(self.frame.utility.session.get_state_dir(), 'recent_download_history'))
         id = dlg.ShowModal()
         
         if id == wx.ID_OK:

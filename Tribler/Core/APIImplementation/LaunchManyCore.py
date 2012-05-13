@@ -36,6 +36,7 @@ from Tribler.community.channel.community import ChannelCommunity
 from Tribler.community.channel.preview import PreviewChannelCommunity
 from Tribler.community.gossiplearningframework.community import GossipLearningCommunity
 from Tribler.Core.Utilities.utilities import get_collected_torrent_filename
+from Tribler.Main.globals import DefaultDownloadStartupConfig
 
 if sys.platform == 'win32':
     SOCKET_BLOCK_ERRORCODE = 10035    # WSAEWOULDBLOCK
@@ -72,6 +73,7 @@ class TriblerLaunchMany(Thread):
         self.dialback_ext_ip = None
         self.yourip_ext_ip = None
         self.udppuncture_handler = None
+        self.internaltracker = None
 
         # Orig
         self.sessdoneflag = Event()
@@ -205,7 +207,11 @@ class TriblerLaunchMany(Thread):
         config = self.session.sessconfig # Should be safe at startup
 
         if config['megacache'] and self.superpeer_db:
-            self.superpeer_db.loadSuperPeers(config)
+            try:
+                self.superpeer_db.loadSuperPeers(config)
+            except:
+                #Niels: if seen busylock error causing LMC to fail loading Tribler.
+                print_exc()
 
         if config['overlay']:
             from Tribler.Core.Overlay.SecureOverlay import SecureOverlay
@@ -269,11 +275,9 @@ class TriblerLaunchMany(Thread):
 
             # Some author: First Category instantiation requires install_dir, so do it now
             from Tribler.Category.Category import Category
-
             Category.getInstance(config['install_dir'])
 
         # Internal tracker
-        self.internaltracker = None
         if config['internaltracker']:
             self.internaltracker = Tracker(config, self.rawserver)
             self.httphandler = HTTPHandler(self.internaltracker.get, config['tracker_min_time_between_log_flushes'])
@@ -289,7 +293,10 @@ class TriblerLaunchMany(Thread):
 
             # Start up KTH mainline DHT
             #TODO: Can I get the local IP number?
-            mainlineDHT.init(('127.0.0.1', self.listen_port), config['state_dir'])
+            try:
+                mainlineDHT.init(('127.0.0.1', self.listen_port), config['state_dir'])
+            except:
+                print_exc()
 
         # add task for tracker checking
         if config['torrent_checking']:
@@ -330,7 +337,7 @@ class TriblerLaunchMany(Thread):
                 while True:
                     try:
                         self.socket = rawserver.create_udpsocket(port, ip)
-                        if __debug__: print >>sys.stderr, "Dispersy listening at", port
+                        print >>sys.stderr, "Dispersy listening at", port
                     except socket.error, error:
                         port += 1
                         continue
@@ -392,31 +399,33 @@ class TriblerLaunchMany(Thread):
             schedule.append((GossipLearningCommunity, (self.session.dispersy_member,), {}))
 
             for cls, args, kargs in schedule:
-                counter = -1
-                for counter, master in enumerate(cls.get_master_members()):
-                    if self.dispersy.has_community(master.mid):
-                        continue
-
-                    cls.load_community(master, *args, **kargs)
-
-                    desync = (yield 1.0)
-                    while desync > 0.1:
-                        if __debug__: print >> sys.stderr, "lmc: busy... backing off for", "%4f" % desync, "seconds [loading community]"
-                        desync = (yield desync)
-
-                if __debug__: print >> sys.stderr, "lmc: restored", counter + 1, cls.get_classification(), "communities"
+                try:
+                    counter = -1
+                    for counter, master in enumerate(cls.get_master_members()):
+                        if self.dispersy.has_community(master.mid):
+                            continue
+    
+                        cls.load_community(master, *args, **kargs)
+    
+                        desync = (yield 1.0)
+                        while desync > 0.1:
+                            if __debug__: print >> sys.stderr, "lmc: busy... backing off for", "%4f" % desync, "seconds [loading community]"
+                            desync = (yield desync)
+    
+                    if __debug__: print >> sys.stderr, "lmc: restored", counter + 1, cls.get_classification(), "communities"
+                except:
+                    #Niels: 07-03-2012 busyerror will cause dispersy not to try other communities
+                    print_exc()
 
         # start dispersy
         config = self.session.sessconfig
-        sqlite_db_path = os.path.join(config['state_dir'], u"sqlite")
-        if not os.path.isdir(sqlite_db_path):
-            os.makedirs(sqlite_db_path)
+        working_directory = config['state_dir']
 
         if sys.argv[0].endswith("dispersy-channel-booster.py"):
             dispersy_cls = __import__("Tribler.Main.dispersy-channel-booster", fromlist=["BoosterDispersy"]).BoosterDispersy
-            self.dispersy = dispersy_cls.get_instance(self.dispersy_thread, sqlite_db_path, singleton_placeholder=Dispersy)
+            self.dispersy = dispersy_cls.get_instance(self.dispersy_thread, working_directory, singleton_placeholder=Dispersy)
         else:
-            self.dispersy = Dispersy.get_instance(self.dispersy_thread, sqlite_db_path)
+            self.dispersy = Dispersy.get_instance(self.dispersy_thread, working_directory)
 
         self.dispersy.socket = DispersySocket(self.rawserver, self.dispersy, config['dispersy_port'])
 
@@ -442,7 +451,7 @@ class TriblerLaunchMany(Thread):
 
         self.initComplete = True
 
-    def add(self,tdef,dscfg,pstate=None,initialdlstatus=None):
+    def add(self,tdef,dscfg,pstate=None,initialdlstatus=None,commit=True, setupDelay = 0):
         """ Called by any thread """
         self.sesslock.acquire()
         try:
@@ -465,22 +474,26 @@ class TriblerLaunchMany(Thread):
 
             # Store in list of Downloads, always.
             self.downloads[infohash] = d
-            d.setup(dscfg,pstate,initialdlstatus,self.network_engine_wrapper_created_callback,self.network_vod_event_callback)
-
+            d.setup(dscfg,pstate,initialdlstatus,self.network_engine_wrapper_created_callback,self.network_vod_event_callback, wrapperDelay=setupDelay)
+            
             if self.torrent_db != None and self.mypref_db != None:
-                raw_filename = tdef.get_name_as_unicode()
-                save_name = get_readable_torrent_name(infohash, raw_filename)
-                #print >> sys.stderr, 'tlm: add', save_name, self.session.sessconfig
-                torrent_dir = self.session.sessconfig['torrent_collecting_dir']
-                save_path = os.path.join(torrent_dir, save_name)
-                if not os.path.exists(save_path):    # save the torrent to the common torrent dir
-                    tdef.save(save_path)
-
-                #Niels: 30-09-2011 additionally save in collectingdir as collected filename
-                normal_name = get_collected_torrent_filename(infohash)
-                save_path = os.path.join(torrent_dir, normal_name)
-                if not os.path.exists(save_path):    # save the torrent to the common torrent dir
-                    tdef.save(save_path)
+                try:
+                    raw_filename = tdef.get_name_as_unicode()
+                    save_name = get_readable_torrent_name(infohash, raw_filename)
+                    #print >> sys.stderr, 'tlm: add', save_name, self.session.sessconfig
+                    torrent_dir = self.session.sessconfig['torrent_collecting_dir']
+                    save_path = os.path.join(torrent_dir, save_name)
+                    if not os.path.exists(save_path):    # save the torrent to the common torrent dir
+                        tdef.save(save_path)
+    
+                    #Niels: 30-09-2011 additionally save in collectingdir as collected filename
+                    normal_name = get_collected_torrent_filename(infohash)
+                    save_path = os.path.join(torrent_dir, normal_name)
+                    if not os.path.exists(save_path):    # save the torrent to the common torrent dir
+                        tdef.save(save_path)
+                except:
+                    #Niels: 06-02-2012 lets make sure this will not crash the start download
+                    print_exc()
 
                 # hack, make sure these torrents are always good so they show up
                 # in TorrentDBHandler.getTorrents()
@@ -491,13 +504,15 @@ class TriblerLaunchMany(Thread):
                 # through the extra_info dictionary
                 extra_info['filename'] = save_name
 
-                self.torrent_db.addExternalTorrent(tdef, source='',extra_info=extra_info)
+                self.torrent_db.addExternalTorrent(tdef, source='',extra_info=extra_info,commit=commit)
                 dest_path = d.get_dest_dir()
+                
                 # TODO: if user renamed the dest_path for single-file-torrent
                 data = {'destination_path':dest_path}
-                self.mypref_db.addMyPreference(infohash, data)
+                self.mypref_db.addMyPreference(infohash, data,commit=commit)
                 # BuddyCast is now notified of this new Download in our
                 # preferences via the Notifier mechanism. See BC.sesscb_ntfy_myprefs()
+            
             return d
         finally:
             self.sesslock.release()
@@ -627,7 +642,8 @@ class TriblerLaunchMany(Thread):
         Called by network thread """
         if DEBUG:
             print >>sys.stderr,"tlm: hashcheck_done, success",success
-        if success:
+        #Niels, 2012-02-01: sdownloadtohashcheck could be none and throw an error here
+        if success and self.sdownloadtohashcheck:
             self.sdownloadtohashcheck.hashcheck_done()
         if self.hashcheck_queue:
             self.dequeue_and_start_hashcheck()
@@ -680,14 +696,15 @@ class TriblerLaunchMany(Thread):
         try:
             dir = self.session.get_downloads_pstate_dir()
             filelist = os.listdir(dir)
-            for basename in filelist:
-                # Make this go on when a torrent fails to start
-                filename = os.path.join(dir,basename)
-                self.resume_download(filename,initialdlstatus)
+            filelist = [os.path.join(dir, filename) for filename in filelist if filename.endswith('.pickle')]
+            
+            for i, filename in enumerate(filelist):
+                shouldCommit = i+1 == len(filelist)
+                self.resume_download(filename,initialdlstatus,commit=shouldCommit,setupDelay=i*0.5)
+                
         finally:
             self.sesslock.release()
-
-
+            
     def load_download_pstate_noexc(self,infohash):
         """ Called by any thread, assume sesslock already held """
         try:
@@ -700,27 +717,73 @@ class TriblerLaunchMany(Thread):
             #self.rawserver_nonfatalerrorfunc(e)
             return None
 
-    def resume_download(self,filename,initialdlstatus=None):
+    def resume_download(self,filename,initialdlstatus=None,commit=True,setupDelay=0):
+        tdef = dscfg = pstate = None
+        
         try:
-            # TODO: filter for file not found explicitly?
             pstate = self.load_download_pstate(filename)
-
-            if DEBUG:
-                print >>sys.stderr,"tlm: load_checkpoint: pstate is",dlstatus_strings[pstate['dlstate']['status']],pstate['dlstate']['progress']
-                if pstate['engineresumedata'] is None:
-                    print >>sys.stderr,"tlm: load_checkpoint: resumedata None"
-                else:
-                    print >>sys.stderr,"tlm: load_checkpoint: resumedata len",len(pstate['engineresumedata'])
-
+            
             tdef = TorrentDef.load_from_dict(pstate['metainfo'])
+            
+            dlconfig = pstate['dlconfig']
+            if isinstance(dlconfig['saveas'], tuple):
+                dlconfig['saveas'] = dlconfig['saveas'][-1]
+            dscfg = DownloadStartupConfig(dlconfig)
 
-            # Activate
-            dscfg = DownloadStartupConfig(dlconfig=pstate['dlconfig'])
-            self.add(tdef,dscfg,pstate,initialdlstatus)
-        except Exception,e:
-            # TODO: remove saved checkpoint?
-            self.rawserver_nonfatalerrorfunc(e)
-
+        except:
+            print_exc()
+            # pstate is invalid or non-existing
+            _, file = os.path.split(filename)
+            infohash = binascii.unhexlify(file[:-7])
+            torrent_dir = self.session.get_torrent_collecting_dir()
+            torrentfile = os.path.join(torrent_dir, get_collected_torrent_filename(infohash))
+            
+            #normal torrentfile is not present, see if readable torrent is there
+            if not os.path.isfile(torrentfile):
+                torrent = self.torrent_db.getTorrent(infohash, keys = ['name'], include_mypref = False)
+                if torrent:
+                    save_name = get_readable_torrent_name(infohash, torrent['name'])
+                    torrentfile = os.path.join(torrent_dir, save_name)
+            
+            #still not found, using dht as fallback
+            if not os.path.isfile(torrentfile):
+                def retrieved_tdef(tdef):
+                    tdef.save(os.path.join(torrent_dir, get_collected_torrent_filename(infohash)))
+                    self.resume_download(filename, initialdlstatus, commit)
+                    
+                TorrentDef.retrieve_from_magnet_infohash(infohash, retrieved_tdef)
+                return
+                
+            if os.path.isfile(torrentfile):
+                tdef = TorrentDef.load(torrentfile)
+            
+                defaultDLConfig = DefaultDownloadStartupConfig.getInstance()
+                dscfg = defaultDLConfig.copy()
+            
+                if self.mypref_db != None:
+                    preferences = self.mypref_db.getMyPrefStatsInfohash(infohash)
+                    if preferences:
+                        if os.path.isdir(preferences[2]):
+                            dscfg.set_dest_dir(preferences[2])
+            
+        if DEBUG:
+            print >>sys.stderr,"tlm: load_checkpoint: pstate is",dlstatus_strings[pstate['dlstate']['status']],pstate['dlstate']['progress']
+            if pstate['engineresumedata'] is None:
+                print >>sys.stderr,"tlm: load_checkpoint: resumedata None"
+            else:
+                print >>sys.stderr,"tlm: load_checkpoint: resumedata len",len(pstate['engineresumedata'])
+        
+        if tdef and dscfg:
+            if dscfg.get_dest_dir() != '': #removed torrent ignoring
+                try:
+                    self.add(tdef,dscfg,pstate,initialdlstatus,commit=commit,setupDelay=setupDelay)
+                except Exception,e:
+                    self.rawserver_nonfatalerrorfunc(e)
+            else:
+                print >> sys.stderr, "tlm: removing checkpoint",filename,"destdir is",dscfg.get_dest_dir()
+                os.remove(filename)
+        else:
+            print >> sys.stderr, "tlm: could not resume checkpoint", filename, tdef, dscfg
 
     def checkpoint(self,stop=False,checkpoint=True,gracetime=2.0):
         """ Called by any thread, assume sesslock already held """
@@ -730,8 +793,8 @@ class TriblerLaunchMany(Thread):
         # in list of states returned via callback.
         #
         dllist = self.downloads.values()
-        if DEBUG:
-            print >>sys.stderr,"tlm: checkpointing",len(dllist)
+        if DEBUG or stop:
+            print >>sys.stderr,"tlm: checkpointing",len(dllist),"stopping",stop
 
         network_checkpoint_callback_lambda = lambda:self.network_checkpoint_callback(dllist,stop,checkpoint,gracetime)
         self.rawserver.add_task(network_checkpoint_callback_lambda,0.0)
@@ -787,6 +850,8 @@ class TriblerLaunchMany(Thread):
 
     def network_shutdown(self):
         try:
+            print >>sys.stderr,"tlm: network_shutdown"
+            
             # Detect if megacache is enabled
             if self.peer_db is not None:
                 from Tribler.Core.CacheDB.sqlitecachedb import SQLiteCacheDB

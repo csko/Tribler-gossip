@@ -135,9 +135,11 @@ class TotalFooter(TitleFooter):
         self.scrollBar = hSizer.AddSpacer((3,0))
         self.scrollBar.sizer = hSizer
     
-    def SetTotal(self, column, total):
+    def SetTotal(self, column, total, tooltip=None):
         str_data = self.columns[column].get('fmt', str)(total)
         self.totals[column].SetLabel(str_data)
+        if tooltip:
+            self.totals[column].SetToolTipString(tooltip)
                 
 class ChannelResultFooter(ListFooter):
     def GetMidPanel(self, hSizer):
@@ -176,6 +178,23 @@ class ChannelResultFooter(ListFooter):
     def Reset(self):
         self.EnableResults(False)
         self.message.SetLabel('')
+        
+class ChannelListFooter(ListFooter):
+    def GetMidPanel(self, hSizer):
+        self.manualAdd = wx.Button(self, -1, "Add Favorite channel")
+        
+        hSizer.AddStretchSpacer()
+        hSizer.Add(self.manualAdd, 0, wx.TOP|wx.BOTTOM, 3)
+        return hSizer
+    
+    def SetEvents(self, onAdd):
+        self.manualAdd.Bind(wx.EVT_BUTTON, onAdd)
+        
+    def EnableAdd(self, state):
+        self.manualAdd.Show(state)
+    
+    def Reset(self):
+        self.EnableAdd(False)
         
 class ChannelFooter(ListFooter):
     def GetMidPanel(self, hSizer):
@@ -384,12 +403,10 @@ class ManageChannelPlaylistFooter(ListFooter):
         hSizer.AddStretchSpacer()
         
         self.addnew = wx.Button(self, -1, "Create New")
-        self.removesel = wx.Button(self, -1, "Remove Selected")
-        self.removeall = wx.Button(self, -1, "Remove All")
-        
         hSizer.Add(self.addnew, 0, wx.TOP|wx.BOTTOM, 3)
-        hSizer.Add(self.removesel, 0, wx.TOP|wx.BOTTOM, 3)
-        hSizer.Add(self.removeall, 0, wx.TOP|wx.BOTTOM, 3)
+        
+    def SetState(self, canDelete, canAdd):
+        self.addnew.Show(canDelete)
         
 class CommentFooter(ListFooter, AbstractDetails):
     def __init__(self, parent, createnew, quickPost):
@@ -443,3 +460,9 @@ class CommentFooter(ListFooter, AbstractDetails):
         else:
             self.addnew.SetLabel('Post')
         self.Layout()
+
+    def EnableCommeting(self, enable):
+        self.commentbox.Enable(enable)
+        self.addnew.Enable(enable)
+        if self.quickAdd:
+            self.quickAdd.Enable(enable)

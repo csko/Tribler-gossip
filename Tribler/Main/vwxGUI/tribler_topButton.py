@@ -11,6 +11,7 @@ from __init__ import LIST_GREY, LIST_BLUE, TRIBLER_RED, LIST_HIGHTLIGHT
 from wx.lib.stattext import GenStaticText
 from wx.lib.stattext import GenStaticText
 from Tribler.Main.vwxGUI import DEFAULT_BACKGROUND
+from Tribler.Main.Utility.GuiDBHandler import startWorker
 
 DEBUG = False
 
@@ -64,6 +65,7 @@ class tribler_topButton(wx.Panel):
         self.Bind(wx.EVT_MOVE, self.setParentBitmap)
         self.Bind(wx.EVT_SIZE, self.setParentBitmap)
         self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.SetCursor(wx.StockCursor(wx.CURSOR_HAND))
         
         self.Refresh()
         self.ready = True
@@ -530,6 +532,7 @@ class LinkText(GenStaticText):
         
         self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouseEvent)
         self.Bind(wx.EVT_MOTION, self.OnMouseEvent)
+        self.enter = False
     
     def SetFonts(self, fonts):
         self.fonts = []
@@ -547,6 +550,7 @@ class LinkText(GenStaticText):
     
     def Reset(self):
         self.SetFontColour(self.fonts[0], self.colours[0])
+        self.enter = False
     
     def SetFontColour(self, font, colour):
         needRefresh = False
@@ -568,10 +572,13 @@ class LinkText(GenStaticText):
     def OnMouseEvent(self, event):
         if event.Moving():
             self.SetFontColour(self.fonts[1], self.colours[1])
+            self.enter = True
+            
         elif event.LeftUp() or event.LeftDown():            
             pass
         else:
             self.SetFontColour(self.fonts[0], self.colours[0])
+            self.enter = False
             
         event.Skip()
         
@@ -824,6 +831,7 @@ class NotebookPanel(wx.Panel):
     
     def SetList(self, list):
         self.list = list
+        self.list.IsShownOnScreen = self.IsShownOnScreen
         self.sizer.Add(list, 1, wx.EXPAND)
     
     def IsShownOnScreen(self):
@@ -845,6 +853,9 @@ class NotebookPanel(wx.Panel):
             
     def Focus(self):
         self.list.Focus()
+        
+    def Reset(self):
+        self.list.Reset()
 
 class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
     def __init__(self, parent, style):
@@ -879,6 +890,7 @@ class BetterListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
 class SelectableListCtrl(BetterListCtrl):
     def __init__(self, parent, style = wx.LC_REPORT|wx.LC_NO_HEADER|wx.NO_BORDER, tooltip = True):
         BetterListCtrl.__init__(self, parent, style, tooltip)
+        self.allselected = False
         self.Bind(wx.EVT_KEY_DOWN, self._CopyToClipboard)
     
     def _CopyToClipboard(self, event):
@@ -900,8 +912,31 @@ class SelectableListCtrl(BetterListCtrl):
                 wx.TheClipboard.Close()
                 
             elif event.GetKeyCode() == 65: #ctrl + a
-                for index in xrange(self.GetItemCount()):
-                    self.Select(index)
+                self.doSelectAll()
+    
+    def doSelectAll(self):
+        for index in xrange(self.GetItemCount()):
+            if self.allselected:
+                self.Select(index, 0)
+            else:
+                self.Select(index, 1)
+        self.allselected = not self.allselected
+                
+class CheckSelectableListCtrl(SelectableListCtrl, CheckListCtrlMixin):
+    def __init__(self, parent, style = wx.LC_REPORT|wx.LC_NO_HEADER|wx.NO_BORDER, tooltip = True):
+        SelectableListCtrl.__init__(self, parent, style, tooltip)
+        CheckListCtrlMixin.__init__(self)
+        
+    def IsSelected(self, index):
+        return self.IsChecked(index)
+    
+    def doSelectAll(self):
+        for index in xrange(self.GetItemCount()):
+            if self.allselected:
+                self.CheckItem(index, False)
+            else:
+                self.CheckItem(index, True)
+        self.allselected = not self.allselected
         
 class TextCtrlAutoComplete(wx.TextCtrl):
     def __init__ (self, parent, entrycallback = None, selectcallback = None, **therest):
@@ -915,11 +950,8 @@ class TextCtrlAutoComplete(wx.TextCtrl):
     
         wx.TextCtrl.__init__(self , parent , **therest)
 
-        # we need the GUITaskQueue to offload database activity, otherwise we may lock the GUI
         self.text = ""
         self.choices = []
-        self.guiserver = GUITaskQueue.getInstance()
-        
         self.screenheight = wx.SystemSettings.GetMetric(wx.SYS_SCREEN_Y)
          
         self.dropdown = wx.PopupWindow(self)
@@ -983,10 +1015,8 @@ class TextCtrlAutoComplete(wx.TextCtrl):
             self.text = text
 
             if self.entrycallback:
-                def wx_callback(choices):
-                    """
-                    Will update the gui IF the user did not yet change the input text
-                    """
+                def wx_callback(delayedResult, text):
+                    choices = delayedResult.get()
                     if text == self.text:
                         self.SetChoices(choices)
                         if len(self.choices) == 0:
@@ -994,16 +1024,10 @@ class TextCtrlAutoComplete(wx.TextCtrl):
                         else:
                             self.ShowDropDown(True)
     
-                def db_callback():
-                    """
-                    Will try to find completions in the database IF the user did not yet change the
-                    input text
-                    """
+                def db_callback(text):
                     if text == self.text:
-                        choices = self.entrycallback(text)
-                        wx.CallAfter(wx_callback, choices)
-    
-                self.guiserver.add_task(db_callback, id = "DoAutoComplete")
+                        return self.entrycallback(text)
+                startWorker(wx_callback, db_callback, cargs = (text,), wargs = (text, ))
 
     def KeyDown(self, event): 
         skip = True 

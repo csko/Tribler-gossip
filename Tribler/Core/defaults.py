@@ -161,7 +161,8 @@ sessdefaults.update(trackerdefaults)
 #  Version 2: as released in Tribler 4.5.0
 #  Version 3: 
 #  Version 4: allow users to specify a download directory every time
-DLDEFAULTS_VERSION = 5
+#  Version 6: allow users to overwrite the multifile destination
+DLDEFAULTS_VERSION = 6
 dldefaults = {}
 dldefaults['version'] = DLDEFAULTS_VERSION
 dldefaults['max_uploads'] = 7
@@ -174,7 +175,7 @@ dldefaults['selector_enabled'] = 1  # whether to enable the file selector and fa
 dldefaults['expire_cache_data'] = 10 # the number of days after which you wish to expire old cache data (0 = disabled)
 dldefaults['priority'] = []  # a list of file priorities separated by commas, must be one per file, 0 = highest, 1 = normal, 2 = lowest, -1 = download disabled'
 dldefaults['saveas'] = None # Set to get_default_destdir()
-dldefaults['showsaveas'] = False # Allow users to choose directory for every new download
+dldefaults['showsaveas'] = True # Allow users to choose directory for every new download
 dldefaults['max_slice_length'] = 2 ** 17
 dldefaults['max_rate_period'] = 20.0
 dldefaults['upload_rate_fudge'] = 5.0
@@ -200,7 +201,7 @@ dldefaults['snub_time'] = 30.0
 dldefaults['rarest_first_cutoff'] = 2
 dldefaults['rarest_first_priority_cutoff'] = 5
 dldefaults['min_uploads'] = 4
-dldefaults['max_files_open'] = 50
+dldefaults['max_files_open'] = 20
 dldefaults['round_robin_period'] = 30
 dldefaults['super_seeder'] = 0
 dldefaults['security'] = 1
@@ -233,6 +234,8 @@ dldefaults['ut_pex_max_addrs_from_peer'] = 50
 # Version 3:
 dldefaults['same_nat_try_internal'] = 0
 dldefaults['unchoke_bias_for_internal'] = 0
+# Version 6: add correctedfilename option
+dldefaults['correctedfilename'] = None
 
 tdefdictdefaults = {}
 tdefdictdefaults['comment'] = None

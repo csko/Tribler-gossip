@@ -39,9 +39,14 @@ class Candidate(object):
         self._connection_type = connection_type
         self._timestamp_incoming = time()
         self._timestamp_last_step = {(member, community.cid):time() - 30.0} if community else {}
+        self._global_times = {}
 
     def __str__(self):
-        return "Candidate " + ("%s:%d" % self._address if self._address else "" + "" if self._address == self._lan_address else " LAN %s:%d" % self._lan_address + "" if self._address == self._wan_address else " WAN %s:%d" % self._wan_address).strip()
+        return "".join(("[",
+                        "%s:%d" % self._address if self._address else "",
+                        "" if self._address == self._lan_address else " LAN %s:%d" % self._lan_address,
+                        "" if self._address == self._wan_address else " WAN %s:%d" % self._wan_address,
+                        "]"))
         
     @property
     def address(self):
@@ -75,6 +80,12 @@ class Candidate(object):
     def timestamp_incoming(self):
         return self._timestamp_incoming
 
+    def set_global_time(self, community, global_time):
+        self._global_times[community.cid] = max(self._global_times.get(community.cid, 0), global_time)
+
+    def get_global_time(self, community):
+        return self._global_times.get(community.cid, 0)
+    
     def members_in_community(self, community):
         return (member for member, cid in self._timestamp_last_step.iterkeys() if member and cid == community.cid)
     
@@ -96,6 +107,8 @@ class Candidate(object):
         self._timestamp_last_step = dict((((member, cid), timestamp))
                                          for (member, cid), timestamp
                                          in self._timestamp_last_step.iteritems() if not cid == community.cid)
+        if community.cid in self._global_times:
+            del self._global_times[community.cid]
         return bool(self._timestamp_last_step)
 
     def out_introduction_request(self, community):
@@ -138,14 +151,16 @@ class Candidate(object):
         assert is_address(address)
         assert is_address(lan_address)
         assert is_address(wan_address)
-        assert address == lan_address or address == wan_address
+        # TODO: fix this properly.
+#        assert address == lan_address or address == wan_address, (address,
+#            lan_address, wan_address)
         if __debug__: dprint("updated ", wan_address[0], ":", wan_address[1], " (", lan_address[0], ":", lan_address[1], ")")
         self._timestamp_last_step.setdefault((member, community.cid), time() - 30)
         self._address = address
         self._lan_address = lan_address
         self._wan_address = wan_address
         self._timestamp_incoming = time()
-
+        
 class LocalhostCandidate(Candidate):
     def __init__(self, dispersy):
         super(LocalhostCandidate, self).__init__(dispersy.lan_address, dispersy.lan_address, dispersy.wan_address)

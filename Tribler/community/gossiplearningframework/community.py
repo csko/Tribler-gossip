@@ -19,6 +19,7 @@ from conversion import JSONConversion
 from payload import MessagePayload, GossipMessage
 from models.logisticregression import LogisticRegressionModel
 from models.adalineperceptron import AdalinePerceptronModel
+from models.p2pegasos import P2PegasosModel
 
 # Send messages every 2 seconds.
 DELAY=2.0
@@ -48,7 +49,6 @@ class GossipLearningCommunity(Community):
             return super(GossipLearningCommunity, cls).load_community(master)
 
     def __init__(self, master):
-        dprint("GOSSIPinit")
         super(GossipLearningCommunity, self).__init__(master)
         if __debug__: dprint('gossiplearningcommunity ' + self._cid.encode("HEX"))
 
@@ -65,8 +65,9 @@ class GossipLearningCommunity(Community):
         self._y = None
 
         # Initial model
-        self._model = AdalinePerceptronModel()
-        self._model2 = LogisticRegressionModel()
+        #self._model = AdalinePerceptronModel()
+        #self._model = LogisticRegressionModel()
+        self._model = P2PegasosModel()
 
 
     def initiate_meta_messages(self):
@@ -97,7 +98,7 @@ class GossipLearningCommunity(Community):
           send_messages.append(meta.impl(authentication=(self._my_member,),
                                    distribution=(self.global_time,),
                                    payload=(message,)))
-          dprint("GOSSIP: calling self._dispersy.store_update_forward(%s, store = False, update = False, forward = True)." % send_messages)
+          # dprint("GOSSIP: calling self._dispersy.store_update_forward(%s, store = False, update = False, forward = True)." % send_messages)
           self._dispersy.store_update_forward(send_messages, store = False, update = False, forward = True)
 #          self._dispersy.store_update_forward(send_messages, store = True, update = True, forward = True) # For testing
 
@@ -121,7 +122,7 @@ class GossipLearningCommunity(Community):
               else:
                 yield message # Accept message.
             else:
-              yield DropMessage(message, "Message must be a Gossip Message")
+              yield DropMessage(message, "Message must be a Gossip Message.")
 
     def on_receive_model(self, messages):
         """

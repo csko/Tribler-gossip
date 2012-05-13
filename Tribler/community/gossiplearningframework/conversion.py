@@ -8,6 +8,7 @@ from Tribler.community.gossiplearningframework.payload import *
 # TODO: autoload
 from Tribler.community.gossiplearningframework.models.logisticregression import LogisticRegressionModel
 from Tribler.community.gossiplearningframework.models.adalineperceptron import AdalinePerceptronModel
+from Tribler.community.gossiplearningframework.models.p2pegasos import P2PegasosModel
 
 if __debug__:
     from Tribler.Core.dispersy.dprint import dprint
@@ -61,7 +62,8 @@ class ClassCoder(json.JSONEncoder):
 
   @classmethod
   def decode_class(cls, d):
-    if isinstance(d, dict) and '__class__' in d and d['__class__'] in ['GossipMessage', 'AdalinePerceptronModel', 'LogisticRegressionModel']:
+    if isinstance(d, dict) and '__class__' in d and d['__class__'] in \
+    ['GossipMessage', 'AdalinePerceptronModel', 'LogisticRegressionModel', 'P2PegasosModel']:
 
       # Get the class, create object.
       res = globals()[str(d['__class__'])]()

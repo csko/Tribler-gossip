@@ -28,6 +28,7 @@ from Tribler.Main.Utility.GuiDBHandler import startWorker
 from Tribler.Core.dispersy.dispersy import Dispersy
 from traceback import print_exc
 from Tribler.Main.vwxGUI import DEFAULT_BACKGROUND, forceDBThread
+from Tribler.Core.BitTornado.BT1.Encrypter import IncompleteCounter
 
 # ProxyService 90s Test_
 #from Tribler.Core.simpledefs import *
@@ -125,19 +126,24 @@ class Home(XRCPanel):
 class Stats(XRCPanel):
     def __init__(self, parent = None):
         XRCPanel.__init__(self, parent)
+        self.createTimer = None
         self.isReady = False
 
     def _DoInit(self):
+        
         try:
             disp = DispersyPanel(self)
         except:
-            self.SetBackgroundColour(wx.RED)
+            #Dispersy not ready, try again in 5s
+            if self.createTimer is None:
+                self.createTimer = wx.CallLater(5000, self._DoInit)
+            else:
+                self.createTimer.Restart(5000)
             print_exc()
             return
 
         self.SetBackgroundColour(DEFAULT_BACKGROUND)
         vSizer = wx.BoxSizer(wx.VERTICAL)
-        vSizer.AddStretchSpacer()
         
         self.dowserStatus = StaticText(self, -1, 'Dowser is not running')
         dowserButton = wx.Button(self, -1, 'Start dowser')
@@ -147,7 +153,7 @@ class Stats(XRCPanel):
         hSizer.Add(dowserButton)
         vSizer.Add(hSizer,0, wx.ALIGN_RIGHT|wx.RIGHT|wx.BOTTOM, 10)
         
-        vSizer.Add(disp, 0, wx.EXPAND|wx.BOTTOM, 10)
+        vSizer.Add(disp, 1, wx.EXPAND|wx.BOTTOM, 10)
 
         hSizer = wx.BoxSizer(wx.HORIZONTAL)
         hSizer.Add(NetworkPanel(self), 1, wx.EXPAND|wx.BOTTOM|wx.RIGHT, 10)
@@ -187,12 +193,19 @@ class Stats(XRCPanel):
     def onKey(self, event):
         if event.ControlDown() and (event.GetKeyCode() == 73 or event.GetKeyCode() == 105): #ctrl + i
             self._showInspectionTool()
+            
+        elif event.ControlDown() and (event.GetKeyCode() == 68 or event.GetKeyCode() == 100): #ctrl + d 
+            self._printDBStats()
         else:
             event.Skip()
 
     def onMouse(self, event):
         if all([event.RightUp(), event.ControlDown(), event.AltDown(), event.ShiftDown()]):
             self._showInspectionTool()
+            
+        elif all([event.LeftUp(), event.ControlDown(), event.AltDown(), event.ShiftDown()]):
+            self._printDBStats()
+            
         else:
             event.Skip()
             
@@ -246,6 +259,12 @@ class Stats(XRCPanel):
         except Exception:
             import traceback
             traceback.print_exc()
+            
+    def _printDBStats(self):
+        torrentdb = TorrentDBHandler.getInstance()
+        tables = torrentdb._db.fetchall("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+        for table, in tables:
+            print >> sys.stderr, table, torrentdb._db.fetchone("SELECT COUNT(*) FROM %s"%table)
 
     def Show(self, show = True):
         if show:
@@ -302,6 +321,7 @@ class NetworkPanel(HomePanel):
         self.channelcastdb = ChannelCastDBHandler.getInstance()
         self.remotetorrenthandler = RemoteTorrentHandler.getInstance()
         self.remotequerymsghandler = RemoteQueryMsgHandler.getInstance()
+        self.incompleteCounter = IncompleteCounter.getInstance()
 
         self.timer = None
 
@@ -320,6 +340,7 @@ class NetworkPanel(HomePanel):
         self.queueSize = StaticText(panel)
         self.nrChannels = StaticText(panel)
         self.nrConnected = StaticText(panel)
+        self.incomplete = StaticText(panel)
 
         self.freeMem = None
         try:
@@ -343,6 +364,8 @@ class NetworkPanel(HomePanel):
         gridSizer.Add(self.nrChannels, 0, wx.EXPAND)
         gridSizer.Add(StaticText(panel, -1, 'Connected peers'))
         gridSizer.Add(self.nrConnected, 0, wx.EXPAND)
+        gridSizer.Add(StaticText(panel, -1, 'Incomplete limit (cur, max, history, maxhistory)'))
+        gridSizer.Add(self.incomplete, 0, wx.EXPAND)
         if self.freeMem:
             gridSizer.Add(StaticText(panel, -1, 'WX:Free memory'))
             gridSizer.Add(self.freeMem, 0, wx.EXPAND)
@@ -377,6 +400,8 @@ class NetworkPanel(HomePanel):
         self.queueSize.SetLabel('%d (%d sources)'%self.remotetorrenthandler.getQueueSize())
         self.nrChannels.SetLabel(str(nr_channels))
         self.nrConnected.SetLabel('%d peers'%len(self.remotequerymsghandler.get_connected_peers()))
+        self.incomplete.SetLabel(", ".join(map(str, self.incompleteCounter.getstats())))
+        
         if self.freeMem:
             self.freeMem.SetLabel(self.guiutility.utility.size_format(wx.GetFreeMemory()))
 
@@ -395,7 +420,7 @@ class DispersyPanel(HomePanel):
 
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self._onTimer, self.timer)
-        self.timer.Start(1000, False)
+        self.timer.Start(5000, False)
         self.UpdateStats()
 
     def CreatePanel(self):
@@ -439,7 +464,7 @@ class DispersyPanel(HomePanel):
             self.gridSizer.Add(self.textdict[key])
 
         for key, value in info.iteritems():
-            if key in ["lan_address", "wan_address", "statistics"]:
+            if key in ["lan_address", "wan_address", "statistics", "connection_type"]:
                 if key == 'statistics':
                     if 'total_up' in value:
                         addColumn('total_up')
@@ -458,6 +483,8 @@ class DispersyPanel(HomePanel):
                 else:
                     addColumn(key)
 
+        addColumn('database_version')
+        addColumn('in_debugmode')
         self.buildColumns = True
 
     def OnMouseEvent(self, event):
@@ -515,17 +542,23 @@ class DispersyPanel(HomePanel):
             self.summary_tree.DeleteAllItems()
             if "communities" in info:
                 root = self.summary_tree.AddRoot("fake")
-                for community in sorted(info["communities"], key=lambda community: community["hex_cid"]):
+                for community in sorted(info["communities"], key=lambda community: (community["classification"], community["hex_cid"])):
                     if community["attributes"]["dispersy_enable_candidate_walker"] or community["attributes"]["dispersy_enable_candidate_walker_responses"]:
                         candidates = str(len(community["candidates"]))
                     else:
                         candidates = "-"
-                    parent = self.summary_tree.AppendItem(root, u"%s %5d %2s %s @%d" % (community["hex_cid"], sum(community["database_sync"].itervalues()), candidates, community["classification"], community["global_time"]))
-                    self.summary_tree.AppendItem(parent, u"%s @%d" % (community["classification"], community["global_time"]))
+                    parent = self.summary_tree.AppendItem(root, u"%s %6d %2s %s @%d ~%d" % (community["hex_cid"], sum(community["database_sync"].itervalues()), candidates, community["classification"], community["global_time"], community["acceptable_global_time"] - community["global_time"] - community["dispersy_acceptable_global_time_range"]))
+                    self.summary_tree.AppendItem(parent, u"classification:     %s" % community["classification"])
+                    self.summary_tree.AppendItem(parent, u"database id:        %d" % community["database_id"])
+                    self.summary_tree.AppendItem(parent, u"global time:        %d" % community["global_time"])
+                    self.summary_tree.AppendItem(parent, u"median global time: %d (%d difference)" % (community["acceptable_global_time"] - community["dispersy_acceptable_global_time_range"], community["acceptable_global_time"] - community["global_time"] - community["dispersy_acceptable_global_time_range"]))
+                    self.summary_tree.AppendItem(parent, u"acceptable range:   %d" % community["dispersy_acceptable_global_time_range"])
                     if community["attributes"]["dispersy_enable_candidate_walker"] or community["attributes"]["dispersy_enable_candidate_walker_responses"]:
                         sub_parent = self.summary_tree.AppendItem(parent, u"candidates: %s" % candidates)
-                        for lan_address, wan_address in community["candidates"]:
-                            self.summary_tree.AppendItem(sub_parent, "%s:%d" % lan_address if lan_address == wan_address else "%s:%d, %s:%d" % (lan_address + wan_address))
+                        for candidate in sorted(("@%d %s:%d" % (global_time, wan_address[0], wan_address[1]) if lan_address == wan_address else "@%d %s:%d, %s:%d" % (global_time, wan_address[0], wan_address[1], lan_address[0], lan_address[1]))
+                                                for lan_address, wan_address, global_time
+                                                in community["candidates"]):
+                            self.summary_tree.AppendItem(sub_parent, candidate)
                     sub_parent = self.summary_tree.AppendItem(parent, u"database: %d packets" % sum(count for count in community["database_sync"].itervalues()))
                     for name, count in sorted(community["database_sync"].iteritems(), key=lambda tup: tup[1]):
                         self.summary_tree.AppendItem(sub_parent, "%s: %d" % (name, count))
@@ -544,11 +577,13 @@ class DispersyPanel(HomePanel):
                     if key == 'statistics':
                         updateColumn('total_down', self.utility.size_format(value['total_down'][1]))
                         updateColumn('total_up', self.utility.size_format(value['total_up'][1]))
-                        updateColumn("total_dropped", self.utility.size_format(int(sum(byte_count for _, byte_count in value["drop"].itervalues()))))
+                        if "drop" in value:
+                            updateColumn("total_dropped", self.utility.size_format(int(sum(byte_count for _, byte_count in value["drop"].itervalues()))))
                         updateColumn('runtime', self.utility.eta_value(value['runtime']))
                         updateColumn('busy_time', self.utility.eta_value(value['busy_time']))
                         updateColumn("avg_down", self.utility.size_format(int(value["total_down"][1] / value["runtime"])) + "/s")
                         updateColumn("avg_up", self.utility.size_format(int(value["total_up"][1] / value["runtime"])) + "/s")
+                        updateColumn("in_debugmode", str(__debug__))
 
                     parentNode = self.tree.AppendItem(fakeRoot, key)
                     addValue(parentNode, value)
@@ -735,7 +770,7 @@ class BuzzPanel(HomePanel):
         self.vSizer.Add(self.getStaticText('...collecting buzz information...'), 0, wx.ALIGN_CENTER)
 
         self.refresh = 5
-        self.GetBuzzFromDB()
+        self.GetBuzzFromDB(doRefresh=True,samplesize=10)
 
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnRefreshTimer, self.timer)
@@ -764,27 +799,26 @@ class BuzzPanel(HomePanel):
         self.ForceUpdate()
 
     def ForceUpdate(self):
-        self.GetBuzzFromDB()
-        self.refresh = 1
-
-    @forceDBThread
-    def GetBuzzFromDB(self, doRefresh=False):
-        # needs fine-tuning:
-        # (especially for cold-start/fresh Tribler install?)
-        samplesize = NetworkBuzzDBHandler.DEFAULT_SAMPLE_SIZE
-
-        self.buzz_cache = [[],[],[]]
-        buzz = self.nbdb.getBuzz(samplesize, with_freq=True, flat=True)
-        for i in range(len(buzz)):
-            random.shuffle(buzz[i])
-            self.buzz_cache[i] = buzz[i]
-
-        if len(self.tags) <= 1 and len(buzz) > 0 or doRefresh:
-            self.OnRefreshTimer(force = True, fromDBThread = True)
-        
+        self.GetBuzzFromDB(doRefresh=True)
+    
+    def GetBuzzFromDB(self, doRefresh=False, samplesize = NetworkBuzzDBHandler.DEFAULT_SAMPLE_SIZE):
+        def do_db():
+            self.buzz_cache = [[],[],[]]
+            buzz = self.nbdb.getBuzz(samplesize, with_freq=True, flat=True)
+            for i in range(len(buzz)):
+                random.shuffle(buzz[i])
+                self.buzz_cache[i] = buzz[i]
+    
+            if len(self.tags) <= 1 and len(buzz) > 0 or doRefresh:
+                self.OnRefreshTimer(force = True, fromDBThread = True)
+        startWorker(None, do_db, uId="NetworkBuzz.GetBuzzFromDB")
 
     @forceWxThread
     def OnRefreshTimer(self, event = None, force = False, fromDBThread = False):
+        if event:
+            if self.DoPauseResume():
+                return
+        
         self.refresh -= 1
         if self.refresh <= 0 or force or fromDBThread:
             if (self.IsShownOnScreen() and self.guiutility.ShouldGuiUpdate()) or force or fromDBThread:
@@ -891,16 +925,19 @@ class BuzzPanel(HomePanel):
         timerstop = not enter #stop timer if one control has enter==true
 
         if timerstop != self.timer.IsRunning():
-            if enter:
-                self.timer.Stop()
-                self.footer.SetTitle('Update has paused')
-            else:
+            if not enter:
                 self.timer.Start(1000, False)
                 self.footer.SetTitle('Resuming update')
+        
+        if enter:
+            self.timer.Stop()
+            self.footer.SetTitle('Update has paused')
+        return enter
 
     def OnMouse(self, event):
         if event.Entering() or event.Moving():
             self.OnEnterWindow(event)
+            
         elif event.Leaving():
             self.OnLeaveWindow(event)
 
@@ -909,6 +946,7 @@ class BuzzPanel(HomePanel):
     def OnEnterWindow(self, event):
         evtobj = event.GetEventObject()
         evtobj.enter = True
+        
         self.DoPauseResume()
 
     def OnLeaveWindow(self, event = None):
@@ -916,7 +954,7 @@ class BuzzPanel(HomePanel):
             evtobj = event.GetEventObject()
             evtobj.enter = False
 
-        self.DoPauseResume()
+        wx.CallAfter(self.DoPauseResume)
 
     def OnClick(self, event):
         evtobj = event.GetEventObject()

@@ -58,6 +58,7 @@ from Tribler.Main.vwxGUI.GuiUtility import GUIUtility, forceWxThread
 from Tribler.Main.Dialogs.GUITaskQueue import GUITaskQueue
 from Tribler.Main.Dialogs.systray import ABCTaskBarIcon
 from Tribler.Main.Dialogs.SaveAs import SaveAs
+from Tribler.Main.Dialogs.ThreadSafeProgressDialog import ThreadSafeProgressDialog
 from Tribler.Main.notification import init as notification_init
 from Tribler.Main.globals import DefaultDownloadStartupConfig,get_default_dscfg_filename
 from Tribler.Main.vwxGUI.SRstatusbar import SRstatusbar
@@ -374,7 +375,6 @@ class MainFrame(wx.Frame):
 
     def startDownloadFromMagnet(self, url, destdir = None):
         def torrentdef_retrieved(tdef):
-            print >> sys.stderr, "_" * 80
             print >> sys.stderr, "Retrieved metadata for:", tdef.get_name()
             self.startDownload(tdef=tdef, destdir = destdir)
                 
@@ -382,6 +382,8 @@ class MainFrame(wx.Frame):
             print >> sys.stderr, "MainFrame.startDownloadFromMagnet() Can not use url to retrieve torrent"
             self.guiUtility.Notify("Download from magnet failed", wx.ART_WARNING)
             return False
+        
+        print >> sys.stderr, "Trying to retrieve metadata for:", url
         return True
     
     def startDownloadFromUrl(self, url, destdir = None):
@@ -396,7 +398,7 @@ class MainFrame(wx.Frame):
         return False
 
     @forceWxThread
-    def startDownload(self,torrentfilename=None,destdir=None,tdef = None,cmdline=False,clicklog=None,name=None,vodmode=False,doemode=None,fixtorrent=False,selectedFiles=None):
+    def startDownload(self,torrentfilename=None,destdir=None,tdef = None,cmdline=False,clicklog=None,name=None,vodmode=False,doemode=None,fixtorrent=False,selectedFiles=None,correctedFilename=None):
         if DEBUG:
             print >>sys.stderr,"mainframe: startDownload:",torrentfilename,destdir,tdef
         
@@ -411,10 +413,18 @@ class MainFrame(wx.Frame):
             cancelDownload = False
             useDefault = not dscfg.get_show_saveas()
             if not useDefault and not destdir:
-                dlg = SaveAs(self, tdef, dscfg.get_dest_dir(), os.path.join(self.utility.session.get_state_dir(), 'recent_download_history'))
+                defaultname = correctedFilename
+                if not correctedFilename and tdef.is_multifile_torrent():
+                    defaultname = tdef.get_name_as_unicode()
+                    
+                dlg = SaveAs(self, tdef, dscfg.get_dest_dir(), defaultname, os.path.join(self.utility.session.get_state_dir(), 'recent_download_history'))
                 dlg.CenterOnParent()
                 if dlg.ShowModal() == wx.ID_OK:
-                    destdir = dlg.GetPath()
+                    #for multifile we enabled correctedFilenames, use split to remove the filename from the path
+                    if tdef.is_multifile_torrent():
+                        destdir, correctedFilename = os.path.split(dlg.GetPath())
+                    else:
+                        destdir = dlg.GetPath()
                 else:
                     cancelDownload = True
                 dlg.Destroy()
@@ -422,6 +432,9 @@ class MainFrame(wx.Frame):
             if not cancelDownload:
                 if destdir is not None:
                     dscfg.set_dest_dir(destdir)
+                    
+                if correctedFilename:
+                    dscfg.set_corrected_filename(correctedFilename)
             
                 # ProxyService 90s Test_
 #                if doemode is not None:
@@ -437,16 +450,7 @@ class MainFrame(wx.Frame):
                     print >>sys.stderr, 'MainFrame: startDownload: Starting in VOD mode'
                     videoplayer = VideoPlayer.getInstance()
                     result = videoplayer.start_and_play(tdef,dscfg)
-    
-                    # 02/03/09 boudewijn: feedback to the user when there
-                    # are no playable files in the torrent
-                    if not result:
-                        dlg = wx.MessageDialog(self,
-                                   self.utility.lang.get("invalid_torrent_no_playable_files_msg"),
-                                   self.utility.lang.get("invalid_torrent_no_playable_files_title"),
-                                   wx.OK|wx.ICON_ERROR)
-                        dlg.ShowModal()
-                        dlg.Destroy()
+                    
                 else:
                     if selectedFiles:
                         dscfg.set_selected_files(selectedFiles)
@@ -520,7 +524,13 @@ class MainFrame(wx.Frame):
     def modifySelection(self, download, selectedFiles):
         tdef = download.get_def()
         dscfg = DownloadStartupConfig(download.dlconfig)
-        dscfg.set_selected_files(selectedFiles)
+        try:
+            dscfg.set_selected_files(selectedFiles)
+            
+        except ValueError:
+            #upon valueerror, change downloadmode to normal, retry
+            dscfg.set_mode(DLMODE_NORMAL)
+            dscfg.set_selected_files(selectedFiles)
         
         self.guiUtility.library_manager.deleteTorrentDownload(download, None, removestate = False)
         self.utility.session.start_download(tdef, dscfg)
@@ -542,8 +552,9 @@ class MainFrame(wx.Frame):
                 f.write(bdata)
                 f.close()
             except:
-                pass
-
+                return False
+        
+        return True
 
     @forceWxThread
     def show_saved(self):
@@ -586,8 +597,11 @@ class MainFrame(wx.Frame):
                 self.upgradeCallback()
 
                 # Boudewijn: start some background downloads to
-                # upgrade on this seperate thread
-                self._upgradeVersion(my_version, self.curr_version, info)
+                # upgrade on this separate thread
+                if len(info) > 0:
+                    self._upgradeVersion(my_version, self.curr_version, info)
+                else:
+                    self._manualUpgrade(my_version, self.curr_version, self.update_url)
             
             # Also check new version of web2definitions for youtube etc. search
             ##Web2Updater(self.utility).checkUpdate()
@@ -712,6 +726,11 @@ class MainFrame(wx.Frame):
                     return (1.0, False)
 
                 download.set_state_callback(state_callback)
+    
+    @forceWxThread
+    def _manualUpgrade(self, my_version, latest_version, url):
+        dialog = wx.MessageDialog(self, 'There is a new version of Tribler.\nYour version:\t\t\t\t%s\nLatest version:\t\t\t%s\n\nPlease visit %s to upgrade.'%(my_version, latest_version, url), 'New version of Tribler is available', wx.OK|wx.ICON_INFORMATION)
+        dialog.ShowModal()
             
     def newversion(self, curr_version, my_version):
         curr = curr_version.split('.')
@@ -741,6 +760,7 @@ class MainFrame(wx.Frame):
         wx.CallLater(6000, self.upgradeCallback)
 
     #Force restart of Tribler
+    @forceWxThread
     def Restart(self):
         path = os.getcwd()
         if sys.platform == "win32":
@@ -759,9 +779,7 @@ class MainFrame(wx.Frame):
                 print_exc()
 
         atexit.register(start_tribler)
-        #self.OnCloseWindow()
-        #self.Close(force = True)
-        sys.exit(0)
+        self.Close(force = True)
     
     def OnFind(self, event):
         self.top_bg.SearchFocus()
@@ -775,14 +793,15 @@ class MainFrame(wx.Frame):
     # minimize to tray bar control
     #######################################
     def onTaskBarActivate(self, event = None):
-        self.Iconize(False)
-        self.Show(True)
-        self.Raise()
-        
-        if self.tbicon is not None:
-            self.tbicon.updateIcon(False)
+        if not self.GUIupdate:
+            self.Iconize(False)
+            self.Show(True)
+            self.Raise()
             
-        self.GUIupdate = True
+            if self.tbicon is not None:
+                self.tbicon.updateIcon(False)
+                
+            self.GUIupdate = True
 
     def onIconify(self, event = None):
         # This event handler is called both when being minimalized
@@ -799,13 +818,10 @@ class MainFrame(wx.Frame):
             #Niels, 2011-06-17: why pause the video? This does not make any sense                                                                                                               
             #videoplayer = VideoPlayer.getInstance()
             #videoplayer.pause_playback() # when minimzed pause playback
-
-            if (self.utility.config.Read('mintray', "int") > 0
-                and self.tbicon is not None):
+            
+            if self.utility.config.Read('mintray', "int") == 1:
                 self.tbicon.updateIcon(True)
-                
-                #Niels, 2011-02-21: on Win7 hiding window is not consistent with default behaviour 
-                #self.Show(False)
+                self.Show(False)
                 
             self.GUIupdate = False
         else:
@@ -888,16 +904,16 @@ class MainFrame(wx.Frame):
                 nr = lookup[nr]
                 found = True
                 
-            print "mainframe: Closing due to event ",nr,`event`
-            print >>sys.stderr,"mainframe: Closing due to event ",nr,`event`
+            print >>sys.stderr, "mainframe: Closing due to event ",nr,`event`
         else:
-            print "mainframe: Closing untriggered by event"
+            print >>sys.stderr, "mainframe: Closing untriggered by event"
         
         
         # Don't do anything if the event gets called twice for some reason
         if self.utility.abcquitting:
+            print 
             return
-
+        
         # Check to see if we can veto the shutdown
         # (might not be able to in case of shutting down windows)
         if event is not None:
@@ -915,6 +931,8 @@ class MainFrame(wx.Frame):
                     dialog.Destroy()
                     if result != wx.ID_OK:
                         event.Veto()
+                        
+                        print >>sys.stderr, "mainframe: Not closing messagebox did not return OK"
                         return
             except:
                 print_exc()
@@ -922,10 +940,15 @@ class MainFrame(wx.Frame):
         self.utility.abcquitting = True
         self.GUIupdate = False
         
-        videoplayer = VideoPlayer.getInstance()
-        videoplayer.stop_playback()
+        if VideoPlayer.hasInstance():
+            print >>sys.stderr, "mainframe: Closing videoplayer"
+
+            videoplayer = VideoPlayer.getInstance()
+            videoplayer.stop_playback()
 
         try:
+            print >>sys.stderr, "mainframe: Restoring from taskbar"
+            
             # Restore the window before saving size and position
             # (Otherwise we'll get the size of the taskbar button and a negative position)
             self.onTaskBarActivate()
@@ -933,33 +956,29 @@ class MainFrame(wx.Frame):
         except:
             print_exc()
 
-        try:
-            if self.videoframe is not None:
-                self.videoframe.Destroy()
-        except:
-            print_exc()
-        
-        try:
-            if self.tbicon is not None:
+        if self.tbicon is not None:
+            try:
+                print >>sys.stderr, "mainframe: Removing tbicon"
+                    
                 self.tbicon.RemoveIcon()
                 self.tbicon.Destroy()
+            except:
+                print_exc()
+            
+        try:
+            print >>sys.stderr, "mainframe: Calling Destroy"
             self.Destroy()
         except:
             print_exc()
-
-        if DEBUG:    
-            print >>sys.stderr,"mainframe: OnCloseWindow END"
+            
+        print >>sys.stderr, "mainframe: Calling quit"
+        self.quit(event != None)
 
         if DEBUG:
+            print >>sys.stderr,"mainframe: OnCloseWindow END"
             ts = enumerate()
             for t in ts:
                 print >>sys.stderr,"mainframe: Thread still running",t.getName(),"daemon",t.isDaemon()
-
-        if not found or sys.platform =="darwin":
-            # On Linux with wx 2.8.7.1 this method gets sometimes called with
-            # a CommandEvent instead of EVT_CLOSE, wx.EVT_QUERY_END_SESSION or
-            # wx.EVT_END_SESSION
-            self.quit()
         
     def onWarning(self,exc):
         msg = self.utility.lang.get('tribler_startup_nonfatalerror')
@@ -983,6 +1002,9 @@ class MainFrame(wx.Frame):
                 win.Show()
             
         wx.CallAfter(do_gui)
+
+    def progressHandler(self, title, message, maximum):
+        return ThreadSafeProgressDialog(title, message, maximum, self, wx.PD_APP_MODAL|wx.PD_ELAPSED_TIME|wx.PD_ESTIMATED_TIME|wx.PD_REMAINING_TIME|wx.PD_AUTO_HIDE)
 
     def onUPnPError(self,upnp_type,listenport,error_type,exc=None,listenproto='TCP'):
 
@@ -1077,9 +1099,14 @@ class MainFrame(wx.Frame):
     def set_wxapp(self,wxapp):
         self.wxapp = wxapp
         
-    def quit(self):
+    def quit(self, force = True):
+        print >> sys.stderr, "mainframe: in quit"
         if self.wxapp is not None:
-            self.wxapp.ExitMainLoop()
-
-     
-     
+            app = self.wxapp
+        else:
+            app = wx.GetApp()
+            
+        if app:
+            wx.CallLater(1000, app.ExitMainLoop)
+            if force:
+                wx.CallLater(2500, app.Exit)

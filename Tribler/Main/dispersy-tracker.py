@@ -6,11 +6,13 @@ Run Dispersy in standalone tracker mode.  Tribler will not be started.
 
 from time import time
 import errno
+import itertools
+import optparse
+import random
 import socket
 import sys
-import traceback
 import threading
-import optparse
+import traceback
 
 from Tribler.Core.BitTornado.RawServer import RawServer
 from Tribler.Core.Statistics.Logger import OverlayLogger
@@ -19,10 +21,8 @@ from Tribler.Core.dispersy.community import Community
 from Tribler.Core.dispersy.conversion import BinaryConversion
 from Tribler.Core.dispersy.crypto import ec_generate_key, ec_to_public_bin, ec_to_private_bin
 from Tribler.Core.dispersy.dispersy import Dispersy
+from Tribler.Core.dispersy.dprint import dprint
 from Tribler.Core.dispersy.member import Member
-
-if __debug__:
-    from Tribler.Core.dispersy.dprint import dprint
 
 if sys.platform == 'win32':
     SOCKET_BLOCK_ERRORCODE = 10035    # WSAEWOULDBLOCK
@@ -91,6 +91,12 @@ class TrackerDispersy(Dispersy):
         assert 0 <= port
         super(TrackerDispersy, self).__init__(callback, statedir)
 
+        # non-autoload nodes
+        self._non_autoload = set()
+        self._non_autoload.update(host for host, _ in self._bootstrap_candidates.iterkeys())
+        # leaseweb machines, some are running boosters, they never unload a community
+        self._non_autoload.update(["95.211.105.65", "95.211.105.67", "95.211.105.69", "95.211.105.71", "95.211.105.73", "95.211.105.75", "95.211.105.77", "95.211.105.79", "95.211.105.81", "85.17.81.36"])
+
         # logger
         overlaylogpostfix = "dp" + str(port) + ".log"
         self._logger = OverlayLogger.getInstance(overlaylogpostfix, statedir)
@@ -107,6 +113,29 @@ class TrackerDispersy(Dispersy):
         except KeyError:
             self._communities[cid] = TrackerCommunity.join_community(Member.get_instance(cid, public_key_available=False), self._my_member)
             return self._communities[cid]
+
+    def _convert_packets_into_batch(self, packets):
+        """
+        Ensure that communities are loaded when the packet is received from a non-bootstrap node,
+        otherwise, load and auto-load are disabled.
+        """
+        def filter_non_bootstrap_nodes():
+            for candidate, packet in packets:
+                cid = packet[2:22]
+
+                if not cid in self._communities and candidate.address[0] in self._non_autoload:
+                    if __debug__: dprint("drop a ", len(packet), " byte packet (received from non-autoload node) from ", candidate, level="warning", force=1)
+                    self._statistics.drop("_convert_packets_into_batch:from bootstrap node for unloaded community", len(packet))
+                    continue
+
+                yield candidate, packet
+
+        packets = list(filter_non_bootstrap_nodes())
+        if packets:
+            return super(TrackerDispersy, self)._convert_packets_into_batch(packets)
+
+        else:
+            return []
 
     def _unload_communities(self):
         def is_active(community):
@@ -128,8 +157,20 @@ class TrackerDispersy(Dispersy):
             desync = (yield 120.0)
             if desync > 0.1:
                 yield desync
-            for community in [community for community in self._communities.itervalues() if not is_active(community)]:
+            inactive = [community for community in self._communities.itervalues() if not is_active(community)]
+            dprint("cleaning ", len(inactive), "/", len(self._communities), " communities")
+            for community in inactive:
                 community.unload_community()
+
+    def yield_random_candidates(self, community, limit, blacklist=(), connection_type_blacklist=()):
+        # the regular yield_random_candidates includes a security mechanism where we first choose
+        # the category (walk or stumble) and than a candidate.  this results in a problem with flash
+        # crowds, we solve this by removing the security mechanism.  this mechanism is not useful
+        # for trackers as they will always receive a steady supply of valid connections as well.
+        candidates = [candidate for candidate in self.yield_all_candidates(community, blacklist)
+                      if (candidate.is_walk or candidate.is_stumble) and not candidate.connection_type in connection_type_blacklist]
+        random.shuffle(candidates)
+        return itertools.islice(candidates, limit)
 
     def create_introduction_request(self, community, destination):
         self._logger("CONN_TRY", community.cid.encode("HEX"), destination.address[0], destination.address[1])

@@ -386,6 +386,7 @@ class BuddyCastFactory:
             # See BitTornado/launchmany.py
             self.overlay_bridge.add_task(self.data_handler.postInit, 0)
             self.overlay_bridge.add_task(self.doBuddyCast, 0.1)
+            
             # Arno: HYPOTHESIS: if set to small, we'll only ask superpeers at clean start.
             if self.data_handler.torrent_db.size() > 0:
                 waitt = 1.0
@@ -714,7 +715,7 @@ class BuddyCastCore:
         
         _now = now()
         # bootstrapped recently, so wait for a while
-        if self.bootstrapped and _now - self.last_bootstrapped < self.bootstrap_interval:
+        if self.bootstrapped and (_now - self.last_bootstrapped) < self.bootstrap_interval:
             self.bootstrap_time = 0    # let it read the most recent peers next time
             return -1
         
@@ -729,9 +730,11 @@ class BuddyCastCore:
         recent_peers_ids = self.selectRecentPeers(target_cands_ids, number, 
                                               startfrom=self.bootstrap_time*number)
         
-        for peer_id in recent_peers_ids:
+        recent_perm_ids = self.data_handler.getPeersPermid(recent_peers_ids)
+        for i, peer_id in enumerate(recent_peers_ids):
             last_seen = self.data_handler.getPeerIDLastSeen(peer_id)
-            self.addConnCandidate(self.data_handler.getPeerPermid(peer_id), last_seen)
+            permid = recent_perm_ids[i]
+            self.addConnCandidate(permid, last_seen)
         self.limitConnCandidate()
         
         self.bootstrap_time += 1
@@ -1821,7 +1824,10 @@ class BuddyCastCore:
                 
             if conn_time >= oldest_peer[0]:     # add it
                 out_peer = oldest_peer[1].split(separator)[1]
-                conn_list.pop(out_peer)            
+                
+                if out_peer in conn_list: #by magic Johan reported a bug that out_peer is sometimes not present in conn_list?
+                    conn_list.pop(out_peer)
+                                
                 conn_list[peer_permid] = conn_time
                 return out_peer
             return peer_permid
@@ -2204,6 +2210,9 @@ class DataHandler:
     
     def getPeerPermid(self, peer_id):
         return self.peer_db.getPermid(peer_id)
+    
+    def getPeersPermid(self, peer_ids):
+        return self.peer_db.getPermids(peer_ids)
 
     def getLocalPeerList(self, max_peers,minoversion=None):
         return self.peer_db.getLocalPeerList(max_peers,minoversion=minoversion)

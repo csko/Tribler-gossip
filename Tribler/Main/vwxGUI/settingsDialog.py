@@ -1,5 +1,4 @@
-# Written by Richard Gwin
-# Modified by Niels Zeilemaker
+# Written by Niels Zeilemaker
 
 # see LICENSE.txt for license information
 import wx
@@ -19,6 +18,8 @@ from Tribler.Main.vwxGUI.UserDownloadChoice import UserDownloadChoice
 from Tribler.Core.simpledefs import DLSTATUS_SEEDING, DLSTATUS_DOWNLOADING
 from Tribler.Core.API import *
 from Tribler.Main.vwxGUI import forceDBThread
+from Tribler.Main.Dialogs.MoveTorrents import MoveTorrents
+from Tribler.Main.Utility.GuiDBHandler import startWorker, cancelWorker
 
 class SettingsDialog(wx.Dialog):
     def __init__(self):
@@ -46,9 +47,13 @@ class SettingsDialog(wx.Dialog):
                              'externalplayer',\
                              'batchstart',\
                              'batchstop',\
+                             'batchmove',\
                              'use_bundle_magic',\
+                             'minimize_to_tray',\
                              't4t0', 't4t0choice', 't4t1', 't4t2', 't4t2text', 't4t3',\
-                             'g2g0', 'g2g0choice', 'g2g1', 'g2g2', 'g2g2text', 'g2g3']
+                             'g2g0', 'g2g0choice', 'g2g1', 'g2g2', 'g2g2text', 'g2g3',\
+                             'use_webui', \
+                             'webui_port']
 
         self.myname = None
         self.elements = {}
@@ -56,10 +61,17 @@ class SettingsDialog(wx.Dialog):
         
         pre = wx.PreDialog() 
         self.PostCreate(pre) 
-        self.Bind(wx.EVT_WINDOW_CREATE, self.OnCreate) 
+        if sys.platform == 'linux2': 
+            self.Bind(wx.EVT_SIZE, self.OnCreate)
+        else:
+            self.Bind(wx.EVT_WINDOW_CREATE, self.OnCreate)
         
     def OnCreate(self, event):
-        self.Unbind(wx.EVT_WINDOW_CREATE)
+        if sys.platform == 'linux2': 
+            self.Unbind(wx.EVT_SIZE)
+        else:
+            self.Unbind(wx.EVT_WINDOW_CREATE)
+        
         wx.CallAfter(self._PostInit)
         event.Skip()
         return True
@@ -84,11 +96,10 @@ class SettingsDialog(wx.Dialog):
         self.tree.AppendItem(root,'Limits',data=wx.TreeItemData(xrc.XRCCTRL(self,"bandwidth_panel")))
         self.tree.AppendItem(root,'Seeding',data=wx.TreeItemData(xrc.XRCCTRL(self,"seeding_panel")))
         self.tree.AppendItem(root,'Misc',data=wx.TreeItemData(xrc.XRCCTRL(self,"misc_panel")))
+        self.tree.AppendItem(root,'Experimental',data=wx.TreeItemData(xrc.XRCCTRL(self,"exp_panel")))
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGING, self.OnSelectionChanging)
 
         #Bind event listeners
-        self.elements['diskLocationChoice'].Bind(wx.EVT_CHECKBOX, self.OnDownloadChoice)
-        
         self.elements['zeroUp'].Bind(wx.EVT_BUTTON, lambda event: self.setUp(0, event))
         self.elements['fiftyUp'].Bind(wx.EVT_BUTTON, lambda event: self.setUp(50, event))
         self.elements['hundredUp'].Bind(wx.EVT_BUTTON, lambda event: self.setUp(100, event))
@@ -105,8 +116,9 @@ class SettingsDialog(wx.Dialog):
         self.elements['edit'].Bind(wx.EVT_BUTTON, self.EditClicked)
         self.elements['browse'].Bind(wx.EVT_BUTTON, self.BrowseClicked)
         
-        self.elements['batchstart'].Bind(wx.EVT_BUTTON, lambda event: self.OnMultiple(True))
-        self.elements['batchstop'].Bind(wx.EVT_BUTTON, lambda event: self.OnMultiple(False))
+        self.elements['batchstart'].Bind(wx.EVT_BUTTON, self.OnMultiple)
+        self.elements['batchstop'].Bind(wx.EVT_BUTTON, self.OnMultiple)
+        self.elements['batchmove'].Bind(wx.EVT_BUTTON, self.OnMultipleMove)
         
         self.Bind(wx.EVT_BUTTON, self.saveAll, id = xrc.XRCID("wxID_OK"))
         self.Bind(wx.EVT_BUTTON, self.cancelAll, id = xrc.XRCID("wxID_CANCEL"))
@@ -157,10 +169,15 @@ class SettingsDialog(wx.Dialog):
         
         self.currentDestDir = self.defaultDLConfig.get_dest_dir()
         self.elements['diskLocationCtrl'].SetValue(self.currentDestDir)
-        self.elements['diskLocationCtrl'].Enable(not self.defaultDLConfig.get_show_saveas())
         self.elements['diskLocationChoice'].SetValue(self.defaultDLConfig.get_show_saveas())
         
         self.elements['use_bundle_magic'].SetValue(self.utility.config.Read('use_bundle_magic', "boolean"))
+        
+        if sys.platform != "darwin":
+            min_to_tray =  self.utility.config.Read('mintray', "int") == 1
+            self.elements['minimize_to_tray'].SetValue(min_to_tray)
+        else:
+            self.elements['minimize_to_tray'].Enabled(False)
         
         self.elements['t4t0'].SetLabel(self.utility.lang.get('no_leeching'))
         self.elements['t4t1'].SetLabel(self.utility.lang.get('unlimited_seeding'))
@@ -171,7 +188,6 @@ class SettingsDialog(wx.Dialog):
         self.elements['g2g1'].SetLabel(self.utility.lang.get('boost__reputation'))
         self.elements['g2g2'].SetLabel(self.utility.lang.get('seed_sometime'))
         self.elements['g2g3'].SetLabel(self.utility.lang.get('no_seeding'))
-        
         
         t4t_option = self.utility.config.Read('t4t_option', 'int')
         self.elements['t4t%d'%t4t_option].SetValue(True)
@@ -194,6 +210,10 @@ class SettingsDialog(wx.Dialog):
         g2g_hours = self.utility.config.Read('g2g_hours', 'int') 
         g2g_mins = self.utility.config.Read('g2g_mins', 'int')
         self.elements['g2g2text'].SetLabel("%d:%d"%(g2g_hours, g2g_mins))
+        
+        self.elements['use_webui'].SetValue(self.utility.config.Read('use_webui', "boolean"))
+        self.elements['webui_port'].SetValue(str(self.utility.config.Read('webui_port', "int")))
+        
         wx.CallAfter(self.Refresh)
     
     def OnSelectionChanging(self, event):
@@ -216,10 +236,6 @@ class SettingsDialog(wx.Dialog):
         
         self.Layout()
         self.Refresh()
-    
-    def OnDownloadChoice(self, event):
-        checked = self.elements['diskLocationChoice'].IsChecked()
-        self.elements['diskLocationCtrl'].Enable(not checked)
 
     def setUp(self, value, event = None):
         self.resetUploadDownloadCtrlColour()
@@ -295,36 +311,48 @@ class SettingsDialog(wx.Dialog):
                         errors['g2g2text'] = 'Needs to be hours:minutes'
                     else:
                         self.elements['g2g2text'].SetValue('')
+                        
+        valwebuiport = self.elements['webui_port'].GetValue().strip()
+        if not valwebuiport.isdigit():
+            errors['webui_port'] = 'Value must be a digit'
         
         if len(errors) == 0: #No errors found, continue saving
             restart = False
             
+            state_dir = self.utility.session.get_state_dir()
+            cfgfilename = self.utility.session.get_default_config_filename(state_dir)
+            scfg = SessionStartupConfig.load(cfgfilename)
+            
             if valdown == 'unlimited':
                 self.utility.ratelimiter.set_global_max_speed(DOWNLOAD, 0)
-                self.guiUtility.utility.config.Write('maxdownloadrate', '0')
+                self.utility.config.Write('maxdownloadrate', '0')
             else:
                 self.utility.ratelimiter.set_global_max_speed(DOWNLOAD, int(valdown))
-                self.guiUtility.utility.config.Write('maxdownloadrate', valdown)
+                self.utility.config.Write('maxdownloadrate', valdown)
 
             if valup == 'unlimited':
                 self.utility.ratelimiter.set_global_max_speed(UPLOAD, 0)
                 self.utility.ratelimiter.set_global_max_seedupload_speed(0)
-                self.guiUtility.utility.config.Write('maxuploadrate', '0')
-                self.guiUtility.utility.config.Write('maxseeduploadrate', '0')
+                self.utility.config.Write('maxuploadrate', '0')
+                self.utility.config.Write('maxseeduploadrate', '0')
             elif valup == '0':
                 self.utility.ratelimiter.set_global_max_speed(UPLOAD, 0.0001)
                 self.utility.ratelimiter.set_global_max_seedupload_speed(0.0001)
-                self.guiUtility.utility.config.Write('maxuploadrate', '-1')
-                self.guiUtility.utility.config.Write('maxseeduploadrate', '-1')
+                self.utility.config.Write('maxuploadrate', '-1')
+                self.utility.config.Write('maxseeduploadrate', '-1')
             else: 
                 self.utility.ratelimiter.set_global_max_speed(UPLOAD, int(valup))
                 self.utility.ratelimiter.set_global_max_seedupload_speed(int(valup))
-                self.guiUtility.utility.config.Write('maxuploadrate', valup)
-                self.guiUtility.utility.config.Write('maxseeduploadrate', valup)
+                self.utility.config.Write('maxuploadrate', valup)
+                self.utility.config.Write('maxseeduploadrate', valup)
 
             if valport != self.currentPortValue:
-                self.currentPortValue = self.elements['firewallValue'].GetValue()
                 self.utility.config.Write('minport', valport)
+                self.utility.config.Write('maxport', int(valport) + 10)
+                
+                scfg.set_dispersy_port(int(valport) - 1)
+                self.saveDefaultDownloadConfig(scfg)
+                
                 self.guiUtility.set_port_number(valport) 
                 self.guiUtility.set_firewall_restart(True)
                 restart = True
@@ -332,22 +360,33 @@ class SettingsDialog(wx.Dialog):
             showSave = self.elements['diskLocationChoice'].IsChecked()
             if showSave != self.defaultDLConfig.get_show_saveas():
                 self.defaultDLConfig.set_show_saveas(showSave)
-                self.saveDefaultDownloadConfig()
-                
+                self.saveDefaultDownloadConfig(scfg)
+            
             if valdir != self.currentDestDir:
                 self.defaultDLConfig.set_dest_dir(valdir)
-                self.saveDefaultDownloadConfig()
                 
+                self.saveDefaultDownloadConfig(scfg)
                 self.moveCollectedTorrents(self.currentDestDir, valdir)
                 restart = True
                 
             useBundleMagic = self.elements['use_bundle_magic'].IsChecked()
             if useBundleMagic != self.utility.config.Read('use_bundle_magic', "boolean"):
                 self.utility.config.Write('use_bundle_magic', useBundleMagic, "boolean")
-
-            state_dir = self.utility.session.get_state_dir()
-            cfgfilename = self.utility.session.get_default_config_filename(state_dir)
-            scfg = SessionStartupConfig.load(cfgfilename)
+                
+            useWebUI = self.elements['use_webui'].IsChecked() 
+            if useWebUI != self.utility.config.Read('use_webui', "boolean"):
+                self.utility.config.Write('use_webui', useWebUI, "boolean")
+                restart = True
+            
+            if valwebuiport != str(self.utility.config.Read('webui_port', "int")):
+                self.utility.config.Write('webui_port', valwebuiport, "int")
+                restart = True
+                
+            curMintray =  self.utility.config.Read('mintray', "int")
+            minimizeToTray = 1 if self.elements['minimize_to_tray'].IsChecked() else 0 
+            if minimizeToTray != curMintray:
+                self.utility.config.Write('mintray', minimizeToTray, "int")
+            
             for target in [scfg,self.utility.session]:
                 try:
                     target.set_nickname(self.elements['myNameField'].GetValue())
@@ -364,10 +403,15 @@ class SettingsDialog(wx.Dialog):
                 self.utility.config.Write('popup_player', selectedPopup, "boolean")
                 restart = True
             
-            # tit-4-tat 
+            # tit-4-tat
+            t4t_option = self.utility.config.Read('t4t_option', 'int')
             for i in range (4):
                 if self.elements['t4t%d'%i].GetValue():
                     self.utility.config.Write('t4t_option', i)
+                    
+                    if i != t4t_option:
+                        restart = True
+                    
                     break
             t4t_ratio = int(float(self.elements['t4t0choice'].GetStringSelection())*100)
             self.utility.config.Write("t4t_ratio", t4t_ratio)
@@ -383,9 +427,13 @@ class SettingsDialog(wx.Dialog):
                     self.utility.config.Write("t4t_mins", 0)
             
             # give-2-get
+            g2g_option = self.utility.config.Read('g2g_option', 'int')
             for i in range (4):
                 if self.elements['g2g%d'%i].GetValue():
                     self.utility.config.Write("g2g_option", i)
+                    
+                    if i != g2g_option:
+                        restart = True
                     break
             g2g_ratio = int(float(self.elements['g2g0choice'].GetStringSelection())*100)
             self.utility.config.Write("g2g_ratio", g2g_ratio)
@@ -440,25 +488,34 @@ class SettingsDialog(wx.Dialog):
         else:
             pass
     
-    @forceDBThread
-    def OnMultiple(self, start):
-        choices = []
-        dstates = []
-        infohashes = []
-        _,_,downloads = self.guiUtility.library_manager.getHitsInCategory()
+    def OnMultiple(self, event):
+        button = event.GetEventObject()
+        button.Enable(False)
+        wx.CallLater(5000, button.Enable, True)
         
-        def sort_by_name(a, b):
-            return cmp(a.name, b.name)
+        start = button == self.elements['batchstart']
         
-        downloads.sort(cmp = sort_by_name)
-        for item in downloads:
-            started = 'active' in item.state
-            if start != started:
-                choices.append(item.name)
-                dstates.append(item.ds)
-                infohashes.append(item.infohash)
+        def do_db():
+            choices = []
+            dstates = []
+            infohashes = []
+            _,_,downloads = self.guiUtility.library_manager.getHitsInCategory()
+        
+            def sort_by_name(a, b):
+                return cmp(a.name, b.name)
+        
+            downloads.sort(cmp = sort_by_name)
+            for item in downloads:
+                started = 'active' in item.state
+                if start != started:
+                    choices.append(item.name)
+                    dstates.append(item.ds)
+                    infohashes.append(item.infohash)
+            
+            return choices, dstates, infohashes
                 
-        def do_gui(choices, dstates, infohashes):
+        def do_gui(delayedResult):
+            choices, dstates, infohashes = delayedResult.get()
             user_download_choice = UserDownloadChoice.get_singleton()
             
             if len(choices) > 0:
@@ -504,8 +561,44 @@ class SettingsDialog(wx.Dialog):
                 dlg = wx.MessageDialog(self, message, 'No torrents found.', wx.OK | wx.ICON_INFORMATION)
                 dlg.ShowModal()
             dlg.Destroy()
+        
+        cancelWorker("OnMultiple")
+        startWorker(do_gui, do_db, uId = "OnMultiple")
+        
+    def OnMultipleMove(self, event):
+        button = event.GetEventObject()
+        button.Enable(False)
+        wx.CallLater(5000, button.Enable, True)
+        
+        start = button == self.elements['batchstart']
+        
+        def do_db():
+            choices = []
+            dstates = []
+            _,_,downloads = self.guiUtility.library_manager.getHitsInCategory()
             
-        wx.CallAfter(do_gui, choices, dstates, infohashes)
+            def sort_by_name(a, b):
+                return cmp(a.name, b.name)
+            
+            downloads.sort(cmp = sort_by_name)
+            for item in downloads:
+                if item.ds:
+                    choices.append(item.name)
+                    dstates.append(item.ds.get_download())
+            
+            return choices, dstates
+        
+        def do_gui(delayedResult):
+            choices, dstates = delayedResult.get()
+            
+            dlg = MoveTorrents(self, choices, dstates)
+            if dlg.ShowModal() == wx.ID_OK:
+                selectedDownloads, new_dir, moveFiles, ignoreIfExists = dlg.GetSettings()
+                for download in selectedDownloads:
+                    self.moveDownload(download, new_dir, moveFiles, ignoreIfExists)
+            dlg.Destroy()
+        
+        startWorker(do_gui, do_db, uId="OnMultipleMove")
         
     def _SelectAll(self, dlg, event, nrchoices):
         if event.ControlDown():
@@ -516,9 +609,8 @@ class SettingsDialog(wx.Dialog):
                     select = list(range(nrchoices))
                     dlg.SetSelections(select)
                 dlg.allselected = not dlg.allselected
-                
 
-    def saveDefaultDownloadConfig(self):
+    def saveDefaultDownloadConfig(self, scfg):
         # Save DownloadStartupConfig
         dlcfgfilename = get_default_dscfg_filename(self.utility.session)
         self.defaultDLConfig.save(dlcfgfilename)
@@ -526,52 +618,60 @@ class SettingsDialog(wx.Dialog):
         # Arno, 2010-03-08: Apparently not copied correctly from abcoptions.py
         # Save SessionStartupConfig
         # Also change torrent collecting dir, which is by default in the default destdir
+        
         state_dir = self.utility.session.get_state_dir()
         cfgfilename = Session.get_default_config_filename(state_dir)
-        scfg = SessionStartupConfig.load(cfgfilename)
-
         defaultdestdir = self.defaultDLConfig.get_dest_dir()
-        dirname = os.path.join(defaultdestdir,STATEDIR_TORRENTCOLL_DIR)
         for target in [scfg,self.utility.session]:
             try:
-                target.set_torrent_collecting_dir(dirname)
+                target.set_torrent_collecting_dir(os.path.join(defaultdestdir, STATEDIR_TORRENTCOLL_DIR))
             except:
                 print_exc()
+            try:
+                target.set_proxyservice_dir(os.path.join(defaultdestdir, PROXYSERVICE_DESTDIR))
+            except:
+                print_exc()
+            try:    
+                target.set_subtitles_collecting_dir(os.path.join(defaultdestdir, STATEDIR_SUBSCOLL_DIR))
+            except:
+                print_exc()    
         scfg.save(cfgfilename)
     
     def moveCollectedTorrents(self, old_dir, new_dir):
-        def move(old_dir, new_dir):
-            
-            #use os.renames as much as possible
-            #use single file/dir copy if target exists
-            def rename_or_merge(old, new):
-                if os.path.exists(old):
-                    if os.path.exists(new):
-                        files = os.listdir(old)
-                        for file in files:
-                            oldfile = os.path.join(old, file)
-                            newfile = os.path.join(new, file)
+        def rename_or_merge(old, new, ignore = True):
+            if os.path.exists(old):
+                if os.path.exists(new):
+                    files = os.listdir(old)
+                    for file in files:
+                        oldfile = os.path.join(old, file)
+                        newfile = os.path.join(new, file)
+                        
+                        if os.path.isdir(oldfile):
+                            self.rename_or_merge(oldfile, newfile)
                             
-                            if os.path.isdir(oldfile):
-                                rename_or_merge(oldfile, newfile)
-                            else:
+                        elif os.path.exists(newfile):
+                            if not ignore:
+                                os.remove(newfile)
                                 os.rename(oldfile, newfile)
-                    else:
-                        os.renames(old, new)
-            
+                        else:
+                            os.rename(oldfile, newfile)
+                else:
+                    os.renames(old, new)
+        
+        def move(old_dir, new_dir):
             #physical move
             old_dirtf = os.path.join(old_dir, 'collected_torrent_files')
             new_dirtf = os.path.join(new_dir, 'collected_torrent_files')
-            rename_or_merge(old_dirtf, new_dirtf)
+            rename_or_merge(old_dirtf, new_dirtf, False)
             
             old_dirsf = os.path.join(old_dir, 'collected_subtitles_files')
             new_dirsf = os.path.join(new_dir, 'collected_subtitles_files')
-            rename_or_merge(old_dirsf, new_dirsf)
+            rename_or_merge(old_dirsf, new_dirsf, False)
         
             # ProxyService_
-            old_dirdh = os.path.join(old_dir, 'proxyservice')
-            new_dirdh = os.path.join(new_dir, 'proxyservice')
-            rename_or_merge(old_dirdh, new_dirdh)
+            old_dirdh = os.path.join(old_dir, PROXYSERVICE_DESTDIR)
+            new_dirdh = os.path.join(new_dir, PROXYSERVICE_DESTDIR)
+            rename_or_merge(old_dirdh, new_dirdh, False)
             
         atexit.register(move, old_dir, new_dir)
         
@@ -587,6 +687,54 @@ class SettingsDialog(wx.Dialog):
         self.guiUtility.torrentsearch_manager.torrent_db.updateTorrentDir(os.path.join(new_dir, 'collected_torrent_files'))
         
         busyDlg.Destroy()
+        
+    def moveDownload(self, download, new_dir, movefiles, ignore):
+        destdirs = download.get_dest_files()
+        if len(destdirs) > 1:
+            old = os.path.commonprefix([os.path.split(path)[0] for _,path in destdirs])
+            _, old_dir = new = os.path.split(old)
+            new = os.path.join(new_dir, old_dir)
+        else:
+            old = destdirs[0][1]
+            _, old_file = os.path.split(old)
+            new = os.path.join(new_dir, old_file)
+        
+        print >> sys.stderr, "Creating new donwloadconfig"
+        tdef = download.get_def()
+        dscfg = DownloadStartupConfig(download.dlconfig)
+        dscfg.set_dest_dir(new_dir)
+        
+        self.guiUtility.library_manager.deleteTorrentDownload(download, None, removestate = False)
+        
+        def rename_or_merge(old, new, ignore = True):
+            if os.path.exists(old):
+                if os.path.exists(new):
+                    files = os.listdir(old)
+                    for file in files:
+                        oldfile = os.path.join(old, file)
+                        newfile = os.path.join(new, file)
+                        
+                        if os.path.isdir(oldfile):
+                            self.rename_or_merge(oldfile, newfile)
+                            
+                        elif os.path.exists(newfile):
+                            if not ignore:
+                                os.remove(newfile)
+                                os.rename(oldfile, newfile)
+                        else:
+                            os.rename(oldfile, newfile)
+                else:
+                    os.renames(old, new)
+        
+        def after_stop():
+            print >> sys.stderr, "Moving from",old,"to",new,"newdir",new_dir
+            if movefiles:
+                rename_or_merge(old, new, ignore)
+        
+            self.utility.session.start_download(tdef, dscfg)
+        
+        #use rawserver as remove is scheduled on rawserver 
+        self.utility.session.lm.rawserver.add_task(after_stop,0.0)
         
     def process_input(self):
         try:

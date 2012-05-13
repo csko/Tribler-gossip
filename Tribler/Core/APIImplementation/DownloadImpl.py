@@ -38,7 +38,7 @@ class DownloadImpl:
     #
     # Creating a Download
     #
-    def setup(self,dcfg=None,pstate=None,initialdlstatus=None,lmcreatedcallback=None,lmvodeventcallback=None):
+    def setup(self,dcfg=None,pstate=None,initialdlstatus=None,lmcreatedcallback=None,lmvodeventcallback=None,wrapperDelay=0):
         """
         Create a Download object. Used internally by Session.
         @param dcfg DownloadStartupConfig or None (in which case 
@@ -51,8 +51,6 @@ class DownloadImpl:
 
             torrentdef = self.get_def()
             metainfo = torrentdef.get_metainfo()
-            # H4xor this so the 'name' field is safe
-            self.correctedinfoname = fix_filebasename(torrentdef.get_name_as_unicode())
 
             if DEBUG:
                 print >>sys.stderr,"Download: setup: piece size",metainfo['info']['piece length']
@@ -96,6 +94,12 @@ class DownloadImpl:
                 cdcfg.updateToCurrentVersion()
             self.dlconfig = copy.copy(cdcfg.dlconfig)
             
+            # H4xor this so the 'name' field is safe
+            self.correctedinfoname = fix_filebasename(torrentdef.get_name_as_unicode())
+            
+            # Allow correctinfoname to be overwritten for multifile torrents only
+            if 'files' in metainfo['info'] and dcfg.get_corrected_filename() and dcfg.get_corrected_filename() != '':
+                self.correctedinfoname = dcfg.get_corrected_filename()
 
             # Copy sessconfig into dlconfig, such that BitTornado.BT1.Connecter, etc.
             # knows whether overlay is on, etc.
@@ -130,7 +134,7 @@ class DownloadImpl:
             if initialdlstatus != DLSTATUS_STOPPED:
                 if pstate is None or pstate['dlstate']['status'] != DLSTATUS_STOPPED: 
                     # Also restart on STOPPED_ON_ERROR, may have been transient
-                    self.create_engine_wrapper(lmcreatedcallback,pstate,lmvodeventcallback,initialdlstatus) # RePEX: propagate initialdlstatus
+                    self.create_engine_wrapper(lmcreatedcallback,pstate,lmvodeventcallback,initialdlstatus,wrapperDelay=wrapperDelay) # RePEX: propagate initialdlstatus
                 
             self.pstate_for_restart = pstate
                 
@@ -140,7 +144,7 @@ class DownloadImpl:
             self.set_error(e)
             self.dllock.release()
 
-    def create_engine_wrapper(self,lmcreatedcallback,pstate,lmvodeventcallback,initialdlstatus=None):
+    def create_engine_wrapper(self,lmcreatedcallback,pstate,lmvodeventcallback,initialdlstatus=None,wrapperDelay=0):
         """ Called by any thread, assume dllock already acquired """
         if DEBUG:
             print >>sys.stderr,"Download: create_engine_wrapper()"
@@ -256,7 +260,7 @@ class DownloadImpl:
 
         # Delegate creation of engine wrapper to network thread
         network_create_engine_wrapper_lambda = lambda:self.network_create_engine_wrapper(infohash,metainfo,kvconfig,multihandler,listenport,vapath,vodfileindex,lmcreatedcallback,pstate,lmvodeventcallback)
-        self.session.lm.rawserver.add_task(network_create_engine_wrapper_lambda,0) 
+        self.session.lm.rawserver.add_task(network_create_engine_wrapper_lambda,wrapperDelay) 
         
 
     def network_create_engine_wrapper(self,infohash,metainfo,kvconfig,multihandler,listenport,vapath,vodfileindex,lmcallback,pstate,lmvodeventcallback):
@@ -366,6 +370,9 @@ class DownloadImpl:
             infohash = self.tdef.get_infohash() 
             pstate = self.network_get_persistent_state()
             if self.sd is not None:
+                if DEBUG:
+                    print >> sys.stderr, "DownloadImpl: network_stop: engineresumedata from sd"
+                
                 pstate['engineresumedata'] = self.sd.shutdown()
                 self.sd = None
                 self.pstate_for_restart = pstate
@@ -383,12 +390,15 @@ class DownloadImpl:
                     # now, at shutdown. In other words, it was never active
                     # in this session and the pstate_for_restart still says 
                     # HASHCHECK.
-                    pstate['engineresumedata'] = self.pstate_for_restart['engineresumedata'] 
+                    pstate['engineresumedata'] = self.pstate_for_restart['engineresumedata']
+                elif DEBUG:
+                    print >> sys.stderr, "DownloadImpl: network_stop: Could not reuse engineresumedata as pstart_for_restart is None"
             
             # Offload the removal of the content and other disk cleanup to another thread
             if removestate:
-                contentdest = self.get_content_dest() 
-                self.session.uch.perform_removestate_callback(infohash,contentdest,removecontent)
+                dest_files = self.get_dest_files()
+                contentdests = [filename for _,filename in dest_files]
+                self.session.uch.perform_removestate_callback(infohash,contentdests,removecontent)
             
             return (infohash,pstate)
         finally:
@@ -528,7 +538,12 @@ class DownloadImpl:
         try:
             pstate = self.network_get_persistent_state() 
             if self.sd is None:
-                resdata = None
+                #Niels: if sd is None, then use pstart_for_restart if present
+                #similar behavior to network_stop
+                if self.pstate_for_restart is not None:
+                    resdata = self.pstate_for_restart['engineresumedata']
+                else:
+                    resdata = None
             else:
                 resdata = self.sd.checkpoint()
             pstate['engineresumedata'] = resdata
