@@ -116,13 +116,13 @@ class GossipLearningCommunity(Community):
         """
         for message in messages:
             if isinstance(message.payload.message, GossipMessage):
-              age = message.payload.message.age
-              if not type(age) == int or age < 0:
-                yield DropMessage(message, "Age must be a nonnegative integer in this protocol.")
-              else:
-                yield message # Accept message.
+                age = message.payload.message.age
+                if not type(age) == int or age < 0:
+                    yield DropMessage(message, "Age must be a nonnegative integer in this protocol.")
+                else:
+                    yield message # Accept message.
             else:
-              yield DropMessage(message, "Message must be a Gossip Message.")
+                yield DropMessage(message, "Message must be a Gossip Message.")
 
     def on_receive_model(self, messages):
         """
@@ -140,12 +140,12 @@ class GossipLearningCommunity(Community):
 
             # Database not yet loaded.
             if self._x == None or self._y == None:
-              dprint("Database not yet loaded.")
-              continue
+                dprint("Database not yet loaded.")
+                continue
 
             # Update model on all local training examples.
             for x, y in zip(self._x, self._y):
-              msg.update(x, y)
+                msg.update(x, y)
 
             # Store model.
             self._model = msg

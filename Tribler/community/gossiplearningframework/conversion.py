@@ -49,30 +49,31 @@ class JSONConversion(BinaryConversion):
         return offset, meta_message.meta.payload.implement(wiredata)
 
 class ClassCoder(json.JSONEncoder):
-  def default(self, obj):
-    if isinstance(obj, GossipMessage):
-      # Get a copy of class variables.
-      result = copy.deepcopy(obj.__dict__)
+    def default(self, obj):
+        if isinstance(obj, GossipMessage):
+            # Get a copy of class variables.
+            result = copy.deepcopy(obj.__dict__)
 
-      # Add the class name.
-      result[u'__class__'] = obj.__class__.__name__
-      return result
-    else:
-      return json.JSONEncoder.default(self, obj)
+            # Add the class name.
+            result[u'__class__'] = obj.__class__.__name__
+            return result
+        else:
+            return json.JSONEncoder.default(self, obj)
 
-  @classmethod
-  def decode_class(cls, d):
-    if isinstance(d, dict) and '__class__' in d and d['__class__'] in \
-    ['GossipMessage', 'AdalinePerceptronModel', 'LogisticRegressionModel', 'P2PegasosModel']:
+    @classmethod
+    def decode_class(cls, d):
+        if isinstance(d, dict) and '__class__' in d and d['__class__'] in \
+            ['GossipMessage', 'AdalinePerceptronModel', 'LogisticRegressionModel', 'P2PegasosModel']:
 
-      # Get the class, create object.
-      res = globals()[str(d['__class__'])]()
+            # Get the class, create object.
+            res = globals()[str(d['__class__'])]()
 
-      # Update class variables recursively.
-      for k, v in d.items():
-        if k != '__class__':
-          res.__dict__[k] = cls.decode_class(v)
+            # Update class variables recursively.
+            for k, v in d.items():
+                if k != '__class__':
+                    res.__dict__[k] = cls.decode_class(v)
 
-      return res
-    else:
-      return d
+            return res
+        else:
+            return d
+
