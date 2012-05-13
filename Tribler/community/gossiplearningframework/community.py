@@ -143,8 +143,10 @@ class GossipLearningCommunity(Community):
               dprint("Database not yet loaded.")
               continue
 
-            # Update model.
-            msg.update(self._x, self._y)
+            # Update model on all local training examples.
+            for x, y in zip(self._x, self._y):
+              msg.update(x, y)
 
             # Store model.
             self._model = msg
+

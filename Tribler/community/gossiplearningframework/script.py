@@ -166,11 +166,11 @@ class ExperimentScript(SetupScript):
         # For now, choose only one instance based on the member id.
         data = self._train_database[mid % len(self._train_database)]
 
-        self._community._x = data[0]
-        self._community._y = data[1]
+        self._community._x = [data[0]]
+        self._community._y = [data[1]]
 
         # Initialize the model also.
-        self._community._w = [0 for i in range(len(self._community._x))]
+        self._community._w = [0 for _ in range(len(data[0]))]
 
         dprint("One instance picked.")
         yield 1.0
