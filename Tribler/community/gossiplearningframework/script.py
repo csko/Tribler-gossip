@@ -49,8 +49,9 @@ class SetupScript(ScriptBase):
         assert master.public_key
         assert not master.private_key
 
-        dprint("-master- ", master.database_id, " ", id(master), " ", master.mid.encode("HEX"), force=1)
-        dprint("-my member- ", self._my_member.database_id, " ", id(self._my_member), " ", self._my_member.mid.encode("HEX"), force=1)
+        if __debug__:
+            dprint("-master- ", master.database_id, " ", id(master), " ", master.mid.encode("HEX"), force=1)
+            dprint("-my member- ", self._my_member.database_id, " ", id(self._my_member), " ", self._my_member.mid.encode("HEX"), force=1)
 
         return GossipLearningCommunity.join_community(master, self._my_member, self._my_member)
 
@@ -61,7 +62,7 @@ class SetupScript(ScriptBase):
 
         # join the community with the newly created member
         self._community = self.join_community()
-        dprint("Joined community ", self._community._my_member)
+        if __debug__: dprint("Joined community ", self._community._my_member)
 
 #        self._community = GossipLearningCommunity.create_community(self._my_member)
         address = self._dispersy.socket.get_address()
@@ -73,15 +74,13 @@ class SetupScript(ScriptBase):
         yield 1.0
 
 # TODO: proper logging
-# TODO: whole database should not be loaded into memory in this script
 # TODO: only works on IRIS
 class ExperimentScript(SetupScript):
     def run(self):
         super(ExperimentScript, self).run()
         self._train_database = []
         self._eval_database = []
-        self.load_database(self._kargs["database"])
-        self.caller(self.pick_instances)
+        self.caller(self.load_database)
         self.caller(self.print_status)
 
     def print_status(self):
@@ -106,31 +105,50 @@ class ExperimentScript(SetupScript):
         yield 1.0
 
 
-    def load_database(self, fname):
+    def load_database(self):
         """
         Load the whole dataset.
         """
-        train_data = []
+        fname = self._kargs["database"]
         eval_data = []
 
+        member_name = self._kargs["hardcoded_member"]
+        num_peers = int(self._kargs["num_peers"])
+        mid = int(member_name[1:]) - 1 # 0-indexed
+
+        
+        # TODO:
+        # if mid >= dblen:
+        #       id %= dblen
+
+        self._community._x = []
+        self._community._y = []
+
+        num = 0
         with open("experiment/db/%s_train.dat" % fname) as f:
             for line in f:
-                x = {}
+                # Choose every midth instance, modulo num_peers.
+                if num % num_peers == mid:
+                    x = {}
+                    vals = line[:-1].split()
+                    y = int(vals[0])
+                    vals = vals[1:]
 
-                vals = line[:-1].split()
-                y = int(vals[0])
-                vals = vals[1:]
+                    for i in vals:
+                        k, v = i.split(":")
+                        x[int(k)] = float(v)
 
-                for i in vals:
-                    k, v = i.split(":")
-                    x[int(k)] = float(v)
+                    # Suppose there are no missing values. Add the bias term.
+                    x2 = [1.0]
+                    for k, v in sorted(x.items()):
+                        x2.append(v)
 
-                # Suppose there are no missing values. Add the bias term.
-                x2 = [1.0]
-                for k, v in sorted(x.items()):
-                    x2.append(v)
+                    self._community._x.append(x2)
+                    self._community._y.append(y)
+                num += 1
 
-                train_data.append((x2, y))
+        if __debug__:
+            dprint("Instances picked: %d" % len(self._community._x))
 
         with open("experiment/db/%s_eval.dat" % fname) as f:
             for line in f:
@@ -153,28 +171,7 @@ class ExperimentScript(SetupScript):
 
         print "Database loaded."
 
-        self._train_database = train_data
         self._eval_database = eval_data
-
-    def pick_instances(self):
-        """
-        Choose one or more instances to be placed on the client based on the member ID.
-        """
-
-        member_name = self._kargs["hardcoded_member"]
-        mid = int(member_name[1:]) - 1
-
-        # For now, choose only one instance based on the member id.
-        data = self._train_database[mid % len(self._train_database)]
-
-        self._community._x = [data[0]]
-        self._community._y = [data[1]]
-
-        # Initialize the model also.
-        self._community._w = [0 for _ in range(len(data[0]))]
-
-        dprint("One instance picked.")
-        yield 1.0
 
     def predict(self):
         """

@@ -8,5 +8,5 @@ mkdir -p logs
 for i in `seq 1 $N`;
 do
     J=`expr $i - 1`
-    screen -dmS "M$J" ./script.sh $J
+    screen -dmS "M$J" ./script.sh $J $N
 done

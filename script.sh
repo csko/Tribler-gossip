@@ -1,7 +1,7 @@
 #!/bin/bash
 
 N=$1
-
+NUMPEERS=$2
 PORT=`expr 20000 + $N`
 MEMBER=M`expr 1 + $N`
 STATE="states/`expr 1 + $N`/"
@@ -11,6 +11,7 @@ mkdir -p "$STATE"
 mkdir -p logs
 
 export PYTHONPATH=.
-CMD="python2 Tribler/Main/dispersy.py --script gossiplearningframework-observe --script-args hardcoded_member=$MEMBER,database=iris_setosa_versicolor --port=$PORT --statedir=$STATE"
+export ARGS="hardcoded_member=$MEMBER,database=iris_setosa_versicolor,num_peers=$NUMPEERS"
+CMD="python2 Tribler/Main/dispersy.py --script gossiplearningframework-observe --script-args $ARGS --port=$PORT --statedir=$STATE"
 echo $CMD
 $CMD >logs/$N.log 2>logs/$N-error.log
