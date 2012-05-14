@@ -34,9 +34,9 @@ class LogisticRegressionModel(GossipLearningModel):
         pos = self.gx(x)
 
         if pos > 0.5:
-          return 1
+            return 1
         else:
-          return 0
+            return 0
 
     def gx(self, x):
         """Calculate P(Y=1 | X=x, w) = 1 / (1 + e^(w'x))."""
@@ -44,7 +44,7 @@ class LogisticRegressionModel(GossipLearningModel):
         x = [x[i]/sum(x) for i in range(len(x))]
 
         # Calculate w'x.
-        wx = sum([wi * xi for (wi,xi) in zip(self.w, x)])
+        wx = sum([self.w[i] * x[i] for i in range(len(self.w))])
 
         # exp() can't handle too high or too low parameters
         if wx > 114:

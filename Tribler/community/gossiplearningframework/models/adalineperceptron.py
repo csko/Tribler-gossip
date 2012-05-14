@@ -27,13 +27,13 @@ class AdalinePerceptronModel(GossipLearningModel):
         self.w = [(1-rate) * self.w[i] + rate / lam * (label - wx) * x[i] for i in range(len(self.w))]
 
     def predict(self, x):
-      x = x[1:] # Remove the bias term.
+        x = x[1:] # Remove the bias term.
 
-      # Calculate w' * x.
-      wx = sum([wi * xi for (wi,xi) in zip(self.w, x)])
+        # Calculate w' * x.
+        wx = sum([self.w[i] * x[i] for i in range(len(self.w))])
 
-      # Return sign(w' * x).
-      return 1 if wx >= 0 else 0
+        # Return sign(w' * x).
+        return 1 if wx >= 0 else 0
 
     def merge(self, model):
         self.age = max(self.age, model.age)
