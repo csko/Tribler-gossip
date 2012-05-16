@@ -128,27 +128,31 @@ class ExperimentScript(SetupScript):
             for line in f:
                 x = {}
                 vals = line[:-1].split()
+                if len(vals) == 0:
+                    continue
                 y = int(vals[0])
                 vals = vals[1:]
 
                 for i in vals:
                     k, v = i.split(":")
-                    x[int(k)] = float(v)
-
-                # Suppose there are no missing values. Add the bias term.
-                x2 = [1.0]
-                for k, v in sorted(x.items()):
-                    x2.append(v)
+                    k = int(k)
+                    x[k] = float(v)
                     if k > maxid:
                         maxid = k
 
+                # Add the bias term.
+                x[0] = 1.0
+#                x2 = [1.0]
+#                for k, v in x.items():
+#                    x2[k] = v
                 # Choose every midth instance, modulo num_peers.
                 if num % num_peers == mid:
-                    self._community._x.append(x2)
+                    self._community._x.append(x)
                     self._community._y.append(y)
                 num += 1
 
         # Initialize model hyperplane dense vector size.
+        # TODO: defaultdict(int) ?
         self._community._model_queue[-1].w = [0 for _ in range(maxid)]
 
         if __debug__:
@@ -159,21 +163,25 @@ class ExperimentScript(SetupScript):
                 x = {}
 
                 vals = line[:-1].split()
+                if len(vals) == 0:
+                    continue
                 y = int(vals[0])
                 vals = vals[1:]
 
                 for i in vals:
                     k, v = i.split(":")
-                    x[int(k)] = float(v)
+                    k = int(k)
+                    x[k] = float(v)
 
-                # Suppose there are no missing values. Add the bias term.
-                x2 = [1.0]
-                for k, v in sorted(x.items()):
-                    x2.append(v)
+                # Add the bias term.
+                x[0] = 1.0
+#                x2 = [1.0]
+#                for k, v in sorted(x.items()):
+#                    x2.append(v)
 
-                eval_data.append((x2, y))
+                eval_data.append((x, y))
 
-        print "Database loaded."
+        if __debug__: dprint("Database loaded.")
 
         self._eval_database = eval_data
 
