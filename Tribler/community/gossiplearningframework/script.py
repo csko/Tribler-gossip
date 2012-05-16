@@ -8,6 +8,7 @@
 from hashlib import sha1
 from time import time
 from os.path import expanduser
+from collections import defaultdict
 import sys
 
 from community import GossipLearningCommunity
@@ -126,13 +127,13 @@ class ExperimentScript(SetupScript):
         maxid = 1
         with open("experiment/db/%s_train.dat" % fname) as f:
             for line in f:
-                x = {}
                 vals = line[:-1].split()
                 if len(vals) == 0:
                     continue
                 y = int(vals[0])
                 vals = vals[1:]
 
+                x = defaultdict(int)
                 for i in vals:
                     k, v = i.split(":")
                     k = int(k)
@@ -160,7 +161,6 @@ class ExperimentScript(SetupScript):
 
         with open("experiment/db/%s_eval.dat" % fname) as f:
             for line in f:
-                x = {}
 
                 vals = line[:-1].split()
                 if len(vals) == 0:
@@ -168,6 +168,7 @@ class ExperimentScript(SetupScript):
                 y = int(vals[0])
                 vals = vals[1:]
 
+                x = defaultdict(int)
                 for i in vals:
                     k, v = i.split(":")
                     k = int(k)
