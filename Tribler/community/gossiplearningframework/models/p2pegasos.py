@@ -9,7 +9,7 @@ class P2PegasosModel(GossipLearningModel):
         super(P2PegasosModel, self).__init__()
 
         # Initial model
-        self.w = [0, 0, 0, 0, 0]
+        self.w = [0]
         self.age = 0
 
     def update(self, x, y):
@@ -22,8 +22,7 @@ class P2PegasosModel(GossipLearningModel):
         rate = 1.0 / (self.age * lam)
 
         is_sv = label * sum([self.w[i] * x[i] for i in range(len(self.w))]) < 1.0
-        max_dim = max(len(self.w), len(x))
-        for i in range(max_dim):
+        for i in range(len(self.w)):
             if is_sv:
                 self.w[i] = (1.0 - 1.0 / self.age) * self.w[i] + rate * label * x[i]
             else:

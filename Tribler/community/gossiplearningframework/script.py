@@ -78,7 +78,6 @@ class SetupScript(ScriptBase):
 class ExperimentScript(SetupScript):
     def run(self):
         super(ExperimentScript, self).run()
-        self._train_database = []
         self._eval_database = []
         self.caller(self.load_database)
         self.caller(self.print_status)
@@ -116,7 +115,6 @@ class ExperimentScript(SetupScript):
         num_peers = int(self._kargs["num_peers"])
         mid = int(member_name[1:]) - 1 # 0-indexed
 
-        
         # TODO:
         # if mid >= dblen:
         #       id %= dblen
@@ -125,27 +123,33 @@ class ExperimentScript(SetupScript):
         self._community._y = []
 
         num = 0
+        maxid = 1
         with open("experiment/db/%s_train.dat" % fname) as f:
             for line in f:
+                x = {}
+                vals = line[:-1].split()
+                y = int(vals[0])
+                vals = vals[1:]
+
+                for i in vals:
+                    k, v = i.split(":")
+                    x[int(k)] = float(v)
+
+                # Suppose there are no missing values. Add the bias term.
+                x2 = [1.0]
+                for k, v in sorted(x.items()):
+                    x2.append(v)
+                    if k > maxid:
+                        maxid = k
+
                 # Choose every midth instance, modulo num_peers.
                 if num % num_peers == mid:
-                    x = {}
-                    vals = line[:-1].split()
-                    y = int(vals[0])
-                    vals = vals[1:]
-
-                    for i in vals:
-                        k, v = i.split(":")
-                        x[int(k)] = float(v)
-
-                    # Suppose there are no missing values. Add the bias term.
-                    x2 = [1.0]
-                    for k, v in sorted(x.items()):
-                        x2.append(v)
-
                     self._community._x.append(x2)
                     self._community._y.append(y)
                 num += 1
+
+        # Initialize model hyperplane dense vector size.
+        self._community._model_queue[-1].w = [0 for _ in range(maxid)]
 
         if __debug__:
             dprint("Instances picked: %d" % len(self._community._x))
@@ -179,7 +183,7 @@ class ExperimentScript(SetupScript):
         """
         mae = 0
         for (x, y) in self._eval_database:
-            ypred = int(self._community._model_queue[-1].predict(x))
+            ypred = int(self._community.predict(x))
             # 0-1 error
             if ypred != y:
                 mae += 1

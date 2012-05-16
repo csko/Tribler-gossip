@@ -174,4 +174,7 @@ class GossipLearningCommunity(Community):
         m1.merge(m2)
         return m1
 
+    def predict(self, x):
+        """Predict with the last model in the queue."""
+        return self._model_queue[-1].predict(x)
 

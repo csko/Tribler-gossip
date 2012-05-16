@@ -9,7 +9,6 @@ class AdalinePerceptronModel(GossipLearningModel):
         super(AdalinePerceptronModel, self).__init__()
 
         # Initial model
-        self.w = [0, 0, 0, 0]
         self.age = 0
 
     def update(self, x, y):
