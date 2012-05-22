@@ -92,7 +92,7 @@ class ExperimentScript(SetupScript):
 
         logfile = "experiment/logs/%05d_%s.log" % (mid, self._kargs["database"])
         with open(logfile, "w") as f:
-            print >>f, "# timestamp member_id age mae msg_count"
+            print >>f, "# timestamp member_id age mae msg_count model"
             while True:
                 print >>f, int(time()), mid,
                 print >>f, self._community._model_queue[-1].age, self.predict(), self._community._msg_count, \

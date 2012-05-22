@@ -11,7 +11,7 @@ mkdir -p "$STATE"
 mkdir -p logs
 
 export PYTHONPATH=.
-export ARGS="hardcoded_member=$MEMBER,database=spambase,num_peers=$NUMPEERS"
+export ARGS="hardcoded_member=$MEMBER,database=iris_setosa_versicolor,num_peers=$NUMPEERS"
 CMD="python2 Tribler/Main/dispersy.py --script gossiplearningframework-observe --script-args $ARGS --port=$PORT --statedir=$STATE"
 echo $CMD
 $CMD >logs/$N.log 2>logs/$N-error.log

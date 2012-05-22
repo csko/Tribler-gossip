@@ -23,8 +23,8 @@ from models.logisticregression import LogisticRegressionModel
 from models.adalineperceptron import AdalinePerceptronModel
 from models.p2pegasos import P2PegasosModel
 
-# Send messages every 2 seconds.
-DELAY=2.0
+# Send messages every 1 seconds.
+DELAY=1.0
 
 # Start after 15 seconds.
 INITIALDELAY=15.0
