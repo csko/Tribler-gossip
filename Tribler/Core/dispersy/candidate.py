@@ -151,7 +151,9 @@ class Candidate(object):
         assert is_address(address)
         assert is_address(lan_address)
         assert is_address(wan_address)
-        assert address == lan_address or address == wan_address
+        # TODO: fix this properly.
+#        assert address == lan_address or address == wan_address, (address,
+#            lan_address, wan_address)
         if __debug__: dprint("updated ", wan_address[0], ":", wan_address[1], " (", lan_address[0], ":", lan_address[1], ")")
         self._timestamp_last_step.setdefault((member, community.cid), time() - 30)
         self._address = address

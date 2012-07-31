@@ -1,0 +1,12 @@
+*.pyc
+experiment/keys/*
+experiment/logs/*
+experiment/gossip_ec_master_private_key*
+dispersy.db
+dispersy.db-journal
+
+# vim
+.*.sw[a-z]
+*.un~
+Session.vim
+

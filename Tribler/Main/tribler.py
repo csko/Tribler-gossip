@@ -99,13 +99,31 @@ from Tribler.Video.VideoServer import SimpleServer
 # one of those modules imports time as a module.
 from time import time, sleep
 
-I2I_LISTENPORT = 57891
-VIDEOHTTP_LISTENPORT = 6875
+# csko: getting port numbers from runtime arguments
+if len(sys.argv) == 5:
+    I2I_LISTENPORT = int(sys.argv[4])
+    VIDEOHTTP_LISTENPORT = int(sys.argv[3])
+    DEFAULTPORT = int(sys.argv[2])
+
+    # Update configuration if it exists. Otherwise, DEFAULTPORT is being used as a default.
+    from Tribler.Core.SessionConfig import SessionStartupConfig
+    configpath = sys.argv[1] + "sessconfig.pickle"
+    config = SessionStartupConfig()
+    try:
+        config.load(configpath)
+    except IOError:
+        pass
+    config.set_listen_port(DEFAULTPORT)
+    config.save(configpath)
+else:
+    I2I_LISTENPORT = 57891
+    VIDEOHTTP_LISTENPORT = 6875
+
 SESSION_CHECKPOINT_INTERVAL = 900.0 # 15 minutes
 CHANNELMODE_REFRESH_INTERVAL = 5.0
 
-DEBUG = False
-ALLOW_MULTIPLE = False
+DEBUG = True
+ALLOW_MULTIPLE = True
 
 ##############################################################
 #
@@ -1110,7 +1128,7 @@ def run(params = None):
     if params is None:
         params = [""]
     
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1 and False: # csko: this is disabled.
         params = sys.argv[1:]
     try:
         # Create single instance semaphore

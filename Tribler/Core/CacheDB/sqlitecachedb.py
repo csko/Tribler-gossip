@@ -1507,7 +1507,7 @@ ALTER TABLE Peer ADD COLUMN services integer DEFAULT 0;
             CREATE VIEW TorrentMarkings AS SELECT * FROM _TorrentMarkings WHERE deleted_at IS NULL;
             CREATE INDEX IF NOT EXISTS TorMarkIndex ON _TorrentMarkings(channeltorrent_id);
             
-            CREATE VIRTUAL TABLE FullTextIndex USING fts3(swarmname, filenames, fileextensions);
+--            CREATE VIRTUAL TABLE FullTextIndex USING fts3(swarmname, filenames, fileextensions);
             
             INSERT INTO MetaDataTypes ('name') VALUES ('name');
             INSERT INTO MetaDataTypes ('name') VALUES ('description');
@@ -1924,15 +1924,16 @@ ALTER TABLE Peer ADD COLUMN services integer DEFAULT 0;
                 FROM CollectedTorrent
                 WHERE torrent_id NOT IN (SELECT rowid FROM FullTextIndex)
                 LIMIT 100"""
-                records = self.fetchall(sql)
+#                records = self.fetchall(sql)
                 
-                if len(records) == 0:
+#                if len(records) == 0:
                     #self.execute_write("DROP TABLE InvertedIndex")
                     
                     # upgradation is complete and hence delete the temp file
-                    os.remove(tmpfilename) 
-                    print >> sys.stderr, "DB Upgradation: temp-file deleted", tmpfilename
-                    return 
+#                    os.remove(tmpfilename) 
+#                    print >> sys.stderr, "DB Upgradation: temp-file deleted", tmpfilename
+#                    return 
+                return 
                 
                 torrent_dir = session.get_torrent_collecting_dir()
                 values = []
@@ -1985,8 +1986,8 @@ ALTER TABLE Peer ADD COLUMN services integer DEFAULT 0;
 
                     values.append((torrent_id, swarmname, " ".join(filenames), " ".join(fileextensions)))
                     
-                if len(values) > 0:
-                    self.executemany(u"INSERT INTO FullTextIndex (rowid, swarmname, filenames, fileextensions) VALUES(?,?,?,?)", values, commit=True)
+#                if len(values) > 0:
+#                    self.executemany(u"INSERT INTO FullTextIndex (rowid, swarmname, filenames, fileextensions) VALUES(?,?,?,?)", values, commit=True)
                 
                 # upgradation not yet complete; comeback after 5 sec
                 tqueue.add_task(upgradeTorrents, 5)
